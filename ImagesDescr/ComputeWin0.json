@@ -1,0 +1,9 @@
+{
+  "timestamp":  "2018-06-07T18:27:35",
+  "description":  "From Compute VM",
+  "osType":  "Windows",
+  "imageName":  "ComputeWin0",
+  "vhdFileName":  "ComputeWin0.vhd",
+  "size": "Standard_A2_v2",
+  "storageType": "Standard"
+}

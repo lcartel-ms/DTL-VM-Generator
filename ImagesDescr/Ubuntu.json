@@ -1,0 +1,9 @@
+{
+  "timestamp":  "2018-06-07T18:27:35",
+  "description":  "From Ubuntu",
+  "osType":  "Linux",
+  "imageName":  "Ubuntu",
+  "vhdFileName":  "Ubuntu.vhd",
+  "size": "Standard_A2_v2",
+  "storageType": "Standard"
+}

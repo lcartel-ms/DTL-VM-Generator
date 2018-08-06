@@ -1,0 +1,9 @@
+{
+  "timestamp":  "2018-06-07T18:27:35",
+  "description":  "From Ubuntu but taken from DTL VM with public IP",
+  "osType":  "Linux",
+  "imageName":  "Ubuntu2",
+  "vhdFileName":  "Ubuntu2.vhd",
+  "size": "Standard_A2_v2",
+  "storageType": "Standard"
+}
