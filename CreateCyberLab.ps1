@@ -3,17 +3,8 @@ param
     [Parameter(Mandatory=$true, HelpMessage="The Name of the new DevTest Lab")]
     [string] $DevTestLabName,
 
-    [Parameter(Mandatory=$true, HelpMessage="The Name of the resource group")]
+    [Parameter(Mandatory=$true, HelpMessage="The Name of the resource group to create the lab in")]
     [string] $ResourceGroupName,
-
-    [Parameter(HelpMessage="The Region for the DevTest Lab")]
-    [string] $ShutDownTime = "1900",
-
-    [Parameter(HelpMessage="The Region for the DevTest Lab")]
-    [string] $TimeZoneId = "W. Europe Standard Time",
-
-    [Parameter(HelpMessage="The Region for the DevTest Lab")]
-    [string] $LabRegion = "westeurope",
 
     [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
     [string] $StorageAccountName,
@@ -23,6 +14,15 @@ param
 
     [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
     [string] $StorageAccountKey,
+
+    [Parameter(HelpMessage="The shutdown time for the lab")]
+    [string] $ShutDownTime = "1900",
+
+    [Parameter(HelpMessage="The timezone to use")]
+    [string] $TimeZoneId = "W. Europe Standard Time",
+
+    [Parameter(HelpMessage="The Region for the DevTest Lab")]
+    [string] $LabRegion = "westeurope",
 
     [Parameter(HelpMessage="The list of users (emails) that we need to add as lab owners")]
     [string[]] $LabOwners = @(),
@@ -34,9 +34,12 @@ param
 # Clear the errors up front-  helps when running the script multiple times
 $error.Clear()
 
-& "$PSScriptRoot\New-DevTestLab.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -ShutDownTime $ShutDownTime -TimeZoneId $TimeZoneId -LabRegion $LabRegion -LabOwners $LabOwners -LabUsers $LabUsers
+$scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
+$newLab = Join-Path $scriptFolder "New-DevTestLab.ps1"
+$copyImages = Join-Path $scriptFolder "CopyCustomImagesToLab.ps1"
+$createVMs = Join-Path $scriptFolder "CreateVMs.ps1"
 
-& "$PSScriptRoot\CopyCustomImagesToLab.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
-
-& "$PSScriptRoot\CreateVMs.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
+& $newLab -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -ShutDownTime $ShutDownTime -TimeZoneId $TimeZoneId -LabRegion $LabRegion -LabOwners $LabOwners -LabUsers $LabUsers
+& $copyImages -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
+& $createVMs -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
 
