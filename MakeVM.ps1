@@ -9,6 +9,9 @@ param
     [Parameter(Mandatory=$true, HelpMessage="The name of the lab")]
     [string] $DevTestLabName,
 
+    [Parameter(Mandatory=$true, HelpMessage="The name of the lab")]
+    [string] $ResourceGroupName,
+
     [Parameter(Mandatory=$true, HelpMessage="The name of the VM to create")]
     [string] $vmName,
 
@@ -37,7 +40,6 @@ if($existingVms.Count -ne 0){
 }
 else {
     $deployName = "Deploy-$DevTestLabName-$vmName"
-    $ResourceGroupName = (Get-AzureRmResource -ResourceType 'Microsoft.DevTestLab/labs' | Where-Object { $_.Name -eq $DevTestLabName}).ResourceGroupName
 
     $vmDeployResult = New-AzureRmResourceGroupDeployment -Name $deployName -ResourceGroupName $ResourceGroupName -TemplateFile $TemplateFilePath -labName $DevTestLabName -newVMName $vmName -size $vmSize -storageType $storageType -customImage $customImage -notes $notes
 

@@ -10,18 +10,32 @@ param
 function SaveProfile {
   $profilePath = Join-Path $PSScriptRoot "profile.json"
 
-  Save-AzureRmContext -Path $profilePath
-}
+  If (Test-Path $profilePath){
+    Remove-Item $profilePath
+  }
+  Save-AzureRmContext -Path $profilePath -Force
 
-function GetProfilePath {
-  $scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
-  Join-Path $scriptFolder "profile.json"
+  return $profilePath
 }
 
 # Clear the errors up front-  helps when running the script multiple times
 $error.Clear()
 
 $ErrorActionPreference = 'Continue'
+
+$scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
+
+# Check we're in the right directory
+if (-not (Test-Path (Join-Path $scriptFolder "MakeVM.ps1"))) {
+  Write-Error "Unable to find the New-DevTestLab.json template...  unable to proceed."
+  return
+}
+
+if (-not (Test-Path (Join-Path $scriptFolder "NewVM.json"))) {
+  Write-Error "Unable to find the New-DevTestLab.json template...  unable to proceed."
+  return
+}
+
 
 $VMDescriptors = Import-Clixml -Path .\foo.xml
 
@@ -35,15 +49,13 @@ if ($lab -eq $null) {
     Write-Error "'$DevTestLabName' Lab doesn't exist, can't create VMs in it"
 }
 
-$scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
 $makeVmScriptLocation = Join-Path $scriptFolder "MakeVM.ps1"
 
 $templatePath = Join-Path $scriptFolder "NewVM.json"
 
 $jobs = @()
 
-SaveProfile
-$profilePath = GetProfilePath
+$profilePath = SaveProfile
 
 # Needed for full image id creation
 $SubscriptionID = (Get-AzureRmContext).Subscription.Id
@@ -57,7 +69,7 @@ foreach($descr in $VMDescriptors) {
 
   $vmName = $baseImageName
   Write-Output "Starting job to create a VM named $vmName"
-  $jobs += Start-Job -Name $file.Name -FilePath $makeVmScriptLocation -ArgumentList $profilePath, $templatePath, $DevTestLabName, $vmName, $descr.size, $descr.storageType, $imageName, $descr.description
+  $jobs += Start-Job -Name $file.Name -FilePath $makeVmScriptLocation -ArgumentList $profilePath, $templatePath, $DevTestLabName, $ResourceGroupName, $vmName, $descr.size, $descr.storageType, $imageName, $descr.description
 }
 
 $jobCount = $jobs.Count

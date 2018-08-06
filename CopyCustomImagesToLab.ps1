@@ -28,6 +28,14 @@ if ($lab -eq $null) {
     exit
 }
 
+$scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
+
+# Check we're in the right directory
+if (-not (Test-Path (Join-Path $scriptFolder "CreateImageFromVHD.json"))) {
+  Write-Error "Unable to find the New-DevTestLab.json template...  unable to proceed."
+  return
+}
+
 # ------------------------------------------------------------------
 # Get the storage account for the lab (temp holding spot for VHDs)
 # ------------------------------------------------------------------
@@ -71,11 +79,11 @@ foreach($file in $downloadedFileNames)
     $sourceImageInfos += $imageObj
 }
 
-$copyHandles = @()
-
 # ------------------------------------------------------------------
 # Next we copy each of the images to the DevTest Lab's storage account
 # ------------------------------------------------------------------
+$copyHandles = @()
+
 foreach ($sourceImage in $sourceImageInfos) {
     $srcURI = $SourceStorageContext.BlobEndPoint + "$StorageContainerName/" + $sourceImage.vhdFileName
     # Create it if it doesn't exist...
@@ -109,7 +117,6 @@ $copyStatus | Where-Object {$_.Status -eq "Success"} | ForEach-Object {
 # Once copies are done, we need to create 'custom images' that use the VHDs by deploying an ARM template
 # ------------------------------------------------------------------
 
-$scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
 $templatePath = Join-Path $scriptFolder "CreateImageFromVHD.json"
 
 foreach ($sourceImage in $sourceImageInfos) {
