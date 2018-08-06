@@ -1,0 +1,9 @@
+{
+  "timestamp":  "2018-06-07T18:27:35",
+  "description":  "From DtlGen2",
+  "osType":  "Windows",
+  "imageName":  "DtlGen2",
+  "vhdFileName":  "DtlGen2.vhd",
+  "size": "Standard_A2_v2",
+  "storageType": "Standard"
+}

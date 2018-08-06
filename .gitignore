@@ -1,0 +1,9 @@
+
+# Exclude packaged modules
+*.zip
+
+# Exclude .NET assemblies from source
+*.dll
+
+#exclude profile file
+profile.json

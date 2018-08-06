@@ -1,0 +1,9 @@
+{
+  "timestamp":  "2018-06-07T18:27:35",
+  "description":  "From DevWin1 VM",
+  "osType":  "Windows",
+  "imageName":  "DevWin1",
+  "vhdFileName":  "DevWin1.vhd",
+  "size": "Standard_A2_v2",
+  "storageType": "Standard"
+}

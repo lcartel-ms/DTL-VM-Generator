@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "devTestLabName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the DevTest Lab to create"
+      }
+    },
+    "region": {
+      "type": "string",
+      "defaultValue": "westeurope",
+      "metadata": {
+        "description": "The Azure region for the DevTest Lab"
+      }
+    },
+    "shutdowntime": {
+      "type": "string",
+      "defaultValue": "1900",
+      "metadata": {
+        "description": "Shutdown Time for the lab in HHMM format"
+      }
+    },
+    "timezoneid": {
+      "type": "string",
+      "defaultValue": "W. Europe Standard Time",
+      "metadata": {
+        "description": "Time Zone Id for shutdown as W. Europe Standard Time"
+      }
+    }
+},
+  "variables": {
+    "schedules_labvmsshutdown_name": "[concat(parameters('devTestLabName'), '/labvmsshutdown')]",
+    "labVirtualNetworkName": "[concat('Dtl', parameters('devTestLabName'))]"
+  },
+  "resources": [
+    {
+      "apiVersion": "2016-05-15",
+      "type": "Microsoft.DevTestLab/labs",
+      "name": "[parameters('devTestLabName')]",
+      "location": "[parameters('region')]",
+      "properties": {
+        "labStorageType": "Standard"
+      },
+      "resources": [
+        {
+          "apiVersion": "2016-05-15",
+          "name": "[variables('labVirtualNetworkName')]",
+          "type": "virtualNetworks",
+          "dependsOn": [
+            "[resourceId('Microsoft.DevTestLab/labs', parameters('devTestLabName'))]"
+          ]
+        },
+        {
+          "type": "schedules",
+          "name": "labvmsshutdown",
+          "apiVersion": "2016-05-15",
+          "location": "westeurope",
+          "properties": {
+            "status": "Enabled",
+            "taskType": "LabVmsShutdownTask",
+            "dailyRecurrence": {
+              "time": "[parameters('shutdowntime')]"
+            },
+            "timeZoneId": "[parameters('timezoneid')]"
+          },
+          "dependsOn": [
+            "[resourceId('microsoft.devtestlab/labs', parameters('devTestLabName'))]"
+          ]
+        }
+      ]
+    }
+  ],
+  "outputs": {
+    "labId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.DevTestLab/labs', parameters('devTestLabName'))]"
+    }
+  }
+}
