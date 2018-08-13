@@ -46,8 +46,10 @@ $procs | Wait-Process -Timeout (60 * 60 * 8)
 $files = @(Get-ChildItem $errorFolder -Filter "*$dateString*.err.txt" -File)
 
 if($files.Count -eq 0) {
-  Write-Output "All process terminated. No errr"
-}
-$files | Foreach-Object {
-  Start-Process $_.Fullname
+  Write-Output "All process terminated. No error"
+} else {
+  Write-Error "Some errors where found. Opening log files with errors."
+  $files | Foreach-Object {
+    Start-Process $_.Fullname
+  }
 }
