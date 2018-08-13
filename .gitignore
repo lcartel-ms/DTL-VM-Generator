@@ -10,3 +10,5 @@ profile.json
 
 #exclude config file
 config.csv
+
+foo.xml
