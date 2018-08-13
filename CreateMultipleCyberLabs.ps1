@@ -1,6 +1,6 @@
 param
 (
-    [Parameter(Mandatory=$true, HelpMessage="Configuration File, see example in directory")]
+    [Parameter(Mandatory=$false, HelpMessage="Configuration File, see example in directory")]
     [string] $ConfigFile = "config.csv",
 
     [Parameter(Mandatory=$false, HelpMessage="The Name of the resource group to create the lab in")]
@@ -33,10 +33,10 @@ ForEach ($lab in $config) {
   $errorFile = $lab.LabName + $dateString + ".err.txt"
   $errorFilePath = Join-Path $errorFolder $errorFile
 
-  $argList = "-DevTestLabName $($lab.DevTestLabName) -ResourceGroupName $($lab.ResourceGroupName) -StorageAccountName $($lab.StorageAccountName) -StorageContainerName $($lab.StorageContainerName) -StorageAccountKey $($lab.StorageAccountKey) -ShutDownTime $($lab.ShutDownTime) -TimeZoneId $($lab.TimeZoneId) -LabRegion $($lab.LabRegion) -LabOwners $($lab.LabOwners) -LabUsers $($lab.LabUsers)"
+  $argList = "-File ""$executable"" -DevTestLabName $($lab.DevTestLabName) -ResourceGroupName $($lab.ResourceGroupName) -StorageAccountName $($lab.StorageAccountName) -StorageContainerName $($lab.StorageContainerName) -StorageAccountKey ""$($lab.StorageAccountKey)"" -ShutDownTime $($lab.ShutDownTime) -TimeZoneId ""$($lab.TimeZoneId)"" -LabRegion ""$($lab.LabRegion)"" -LabOwners ""$($lab.LabOwners)"" -LabUsers ""$($lab.LabUsers)"""
 
   Write-Output "Starting $executable $argList ..."
-  $procs += Start-Process -FilePath $executable -PassThru -WindowStyle $WindowsStyle -RedirectStandardError $errorFilePath -ArgumentList $argList -WorkingDirectory $scriptFolder
+  $procs += Start-Process "powershell.exe" -PassThru -WindowStyle $WindowsStyle -RedirectStandardError $errorFilePath -ArgumentList $argList -WorkingDirectory $scriptFolder
 }
 
 Write-Output "Waiting for all processes to end"
