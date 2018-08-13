@@ -66,9 +66,8 @@ foreach($descr in $VMDescriptors) {
   # Also making it unique the same way as the custom image to avoid disk clash
   $baseImageName = $DevTestLabName + $descr.imageName
   $imageName = "/subscriptions/$SubscriptionID/ResourceGroups/$ResourceGroupName/providers/Microsoft.DevTestLab/labs/$DevTestLabName/customImages/$baseImageName"
-
-  #$vmName = $baseImageName
   $vmName = $descr.imageName
+
   Write-Output "Starting job to create a VM named $vmName"
   $jobs += Start-Job -Name $file.Name -FilePath $makeVmScriptLocation -ArgumentList $profilePath, $templatePath, $DevTestLabName, $ResourceGroupName, $vmName, $descr.size, $descr.storageType, $imageName, $descr.description
 }
