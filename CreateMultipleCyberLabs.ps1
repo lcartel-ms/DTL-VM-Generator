@@ -3,8 +3,12 @@ param
     [Parameter(Mandatory=$false, HelpMessage="Configuration File, see example in directory")]
     [string] $ConfigFile = "config.csv",
 
-    [Parameter(Mandatory=$false, HelpMessage="The Name of the resource group to create the lab in")]
-    [string] $WindowsStyle =  "Minimized"
+    [Parameter(Mandatory=$false, HelpMessage="Window style for the spawn off processes")]
+    [string] $WindowsStyle =  "Minimized",
+
+    [Parameter(Mandatory=$false, HelpMessage="How many minutes to wait before starting the next parallel lab creation")]
+    [int] $MinutesToNextLabCreation =  2
+
 )
 
 # Clear the errors up front-  helps when running the script multiple times
@@ -37,6 +41,7 @@ ForEach ($lab in $config) {
 
   Write-Output "Starting $executable $argList ..."
   $procs += Start-Process "powershell.exe" -PassThru -WindowStyle $WindowsStyle -RedirectStandardError $errorFilePath -ArgumentList $argList -WorkingDirectory $scriptFolder
+  Start-Sleep -Seconds ($MinutesToNextLabCreation * 60)
 }
 
 Write-Output "Waiting for all processes to end"
