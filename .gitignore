@@ -7,3 +7,6 @@
 
 #exclude profile file
 profile.json
+
+#exclude config file
+config.csv
