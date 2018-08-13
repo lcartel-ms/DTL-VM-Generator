@@ -12,3 +12,6 @@ profile.json
 *.csv
 
 *.xml
+
+#Exclude logs
+logs/*
