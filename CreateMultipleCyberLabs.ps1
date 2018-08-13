@@ -48,7 +48,11 @@ Write-Output "Waiting for all processes to end"
 $procs | Wait-Process -Timeout (60 * 60 * 8)
 
 # Check if there were errors by looking for the presence of error files
-$files = @(Get-ChildItem $errorFolder -Filter "*$dateString*.err.txt" -File)
+if (Test-Path $errorFolder) {
+  $files = @(Get-ChildItem $errorFolder -Filter "*$dateString*.err.txt" -File)
+} else {
+  $files = @()
+}
 
 if($files.Count -eq 0) {
   Write-Output "All process terminated. No error"
