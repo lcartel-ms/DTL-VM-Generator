@@ -92,7 +92,7 @@ if ($error.Count -eq 0) {
 
         # Add all the lab users to the lab
         foreach ($useremail in $LabUsers) {
-            $userPrinciple = Get-AzureRmADUser -Mail $user
+            $userPrinciple = Get-AzureRmADUser -Mail $useremail
 
             if ($userPrinciple.Count -eq $null) {
                 Write-Output "unable to find '$user' in Azure Active Directory, cannot add them as a DevTest Lab User automatically to this new lab '$DevTestLabName' , in this sector '$Sector'"

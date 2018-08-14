@@ -25,6 +25,7 @@ if (-not (Test-Path $executable)) {
 
 # Create Unique string for error files
 $dateString = get-date -f "-yyyy_MM_dd-HH_mm_ss"
+Write-Output "Error logs for this run are in logs/ and contain the string $datestring"
 
 $config = Import-Csv $ConfigFile
 
@@ -46,24 +47,8 @@ ForEach ($lab in $config) {
   $count += 1
 }
 
-# Write-Output "Waiting for all processes to end"
-# $procs | Wait-Process -Timeout (60 * 60 * 8)
-
-<# $jobs = @()
-
-ForEach ($lab in $config) {
-  Write-Output "Starting job to create $($lab.DevTestLabName)"
-  $jobs += Start-Job -Name $lab.DevTestLabName -FilePath $executable -ArgumentList $lab.DevTestLabName, $lab.ResourceGroupName, $lab.StorageAccountName, $lab.StorageContainerName, $lab.StorageAccountKey, $lab.ShutDownTime, $lab.TimeZoneId, $lab.LabRegion, $lab.LabOwners, $lab.LabUsers
-}
-
-$jobCount = $jobs.Count
-Write-Output "Waiting for $jobCount Lab creation jobs to complete"
-foreach ($job in $jobs){
-    $jobOutput = Receive-Job $job -Wait
-    Write-Output $jobOutput
-}
-Remove-Job -Job $jobs
- #>
+Write-Output "Waiting for all processes to end"
+$procs | Wait-Process -Timeout (60 * 60 * 8)
 
 # Check if there were errors by looking for the presence of error files
 if (Test-Path $errorFolder) {
