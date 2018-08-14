@@ -32,16 +32,18 @@ $errorFolder = Join-Path $scriptFolder "logs\"
 
 $procs = @()
 
+$count = 1
 Write-Output "Starting processes to create labs in $WindowsStyle windows ..."
 ForEach ($lab in $config) {
-  $errorFile = $lab.LabName + $dateString + ".err.txt"
+  $errorFile = $lab.DevTestLabName + $dateString + ".err.txt"
   $errorFilePath = Join-Path $errorFolder $errorFile
 
   $argList = "-File ""$executable"" -DevTestLabName $($lab.DevTestLabName) -ResourceGroupName $($lab.ResourceGroupName) -StorageAccountName $($lab.StorageAccountName) -StorageContainerName $($lab.StorageContainerName) -StorageAccountKey ""$($lab.StorageAccountKey)"" -ShutDownTime $($lab.ShutDownTime) -TimeZoneId ""$($lab.TimeZoneId)"" -LabRegion ""$($lab.LabRegion)"" -LabOwners ""$($lab.LabOwners)"" -LabUsers ""$($lab.LabUsers)"""
 
-  Write-Output "Starting $executable $argList ..."
+  Write-Output "$count : Creating lab $($lab.DevTestLabName)"
   $procs += Start-Process "powershell.exe" -PassThru -WindowStyle $WindowsStyle -RedirectStandardError $errorFilePath -ArgumentList $argList -WorkingDirectory $scriptFolder
   Start-Sleep -Seconds ($MinutesToNextLabCreation * 60)
+  $count += 1
 }
 
 # Write-Output "Waiting for all processes to end"
