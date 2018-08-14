@@ -28,9 +28,9 @@ $dateString = get-date -f "-yyyy_MM_dd-HH_mm_ss"
 
 $config = Import-Csv $ConfigFile
 
-$procs = @()
-
 $errorFolder = Join-Path $scriptFolder "logs\"
+
+$procs = @()
 
 Write-Output "Starting processes to create labs in $WindowsStyle windows ..."
 ForEach ($lab in $config) {
@@ -44,8 +44,24 @@ ForEach ($lab in $config) {
   Start-Sleep -Seconds ($MinutesToNextLabCreation * 60)
 }
 
-Write-Output "Waiting for all processes to end"
-$procs | Wait-Process -Timeout (60 * 60 * 8)
+# Write-Output "Waiting for all processes to end"
+# $procs | Wait-Process -Timeout (60 * 60 * 8)
+
+<# $jobs = @()
+
+ForEach ($lab in $config) {
+  Write-Output "Starting job to create $($lab.DevTestLabName)"
+  $jobs += Start-Job -Name $lab.DevTestLabName -FilePath $executable -ArgumentList $lab.DevTestLabName, $lab.ResourceGroupName, $lab.StorageAccountName, $lab.StorageContainerName, $lab.StorageAccountKey, $lab.ShutDownTime, $lab.TimeZoneId, $lab.LabRegion, $lab.LabOwners, $lab.LabUsers
+}
+
+$jobCount = $jobs.Count
+Write-Output "Waiting for $jobCount Lab creation jobs to complete"
+foreach ($job in $jobs){
+    $jobOutput = Receive-Job $job -Wait
+    Write-Output $jobOutput
+}
+Remove-Job -Job $jobs
+ #>
 
 # Check if there were errors by looking for the presence of error files
 if (Test-Path $errorFolder) {
