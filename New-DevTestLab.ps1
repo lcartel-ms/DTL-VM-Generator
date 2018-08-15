@@ -81,10 +81,10 @@ if ($error.Count -eq 0) {
             else {
                 # Found the user, but might have a list
                 if ($userPrinciple.Count -gt 0) {
-                    $spid = $userPrinciple[0].Id
+                    $spid = $userPrinciple[0].Id.Guid
                 }
                 else {
-                    $spid = $userPrinciple.Id
+                    $spid = $userPrinciple.Id.Guid
                 }
 
                 New-AzureRmRoleAssignment -ObjectId $spid -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
@@ -103,10 +103,10 @@ if ($error.Count -eq 0) {
             else {
                 # Found the user, but might have a list
                 if ($userPrinciple.Count -gt 0) {
-                    $spid = $userPrinciple[0].Id
+                    $spid = $userPrinciple[0].Id.Guid
                 }
                 else {
-                    $spid = $userPrinciple.Id
+                    $spid = $userPrinciple.Id.Guid
                 }
 
                 New-AzureRmRoleAssignment -ObjectId $spid -RoleDefinitionName 'DevTest Labs User' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
