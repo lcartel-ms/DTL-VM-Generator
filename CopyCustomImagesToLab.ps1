@@ -132,6 +132,9 @@ foreach ($sourceImage in $sourceImageInfos) {
     # Delete the VHD, we don't need it after the custom image is created, since it uses managed images
     Remove-AzureStorageBlob -Context $DestStorageContext -Container 'uploads' -Blob $sourceImage.vhdFileName
 
+    # Remove Deployment
+    Remove-AzureRmResourceGroupDeployment -ResourceGroupName $labRgName -Name $deployName  -ErrorAction SilentlyContinue | Out-Null
+
     if($deployResult.ProvisioningState -eq "Succeeded"){
         Write-Output "Successfully deployed custom image $($sourceImage.vhdFileName) to Lab $DevTestLabName"
     }

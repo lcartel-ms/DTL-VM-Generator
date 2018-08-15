@@ -67,6 +67,9 @@ if ($error.Count -eq 0) {
         # Create the DevTest Lab
         $newLab = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile (Join-Path $PSScriptRoot "New-DevTestLab.json") -devTestLabName $DevTestLabName -region $LabRegion -shutdowntime $ShutDownTime -timezoneid $TimeZoneId
 
+        # Remove Deployment
+        Remove-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName  -ErrorAction SilentlyContinue | Out-Null
+
         # Add all the lab owners to the lab
         foreach ($owneremail in $LabOwners) {
             # see if we can find the user in AAD - must be the display name, NOT the email

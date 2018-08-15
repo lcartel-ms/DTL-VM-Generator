@@ -46,6 +46,7 @@ else {
     if(-not ($vmDeployResult.ProvisioningState -eq "Succeeded")) {
         Write-Error "##[error]Deploying VM failed:  $vmName from $TemplateFilePath"
     }
+    Remove-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deployName  -ErrorAction SilentlyContinue | Out-Null
 
     return $vmName
 }
