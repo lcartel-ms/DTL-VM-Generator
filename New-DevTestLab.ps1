@@ -72,47 +72,24 @@ if ($error.Count -eq 0) {
 
         # Add all the lab owners to the lab
         foreach ($owneremail in $LabOwners) {
-            # see if we can find the user in AAD - must be the display name, NOT the email
-            $userPrinciple = Get-AzureRmADUser -Mail $owneremail
-
-            if ($userPrinciple -eq $null) {
-                Write-Output "unable to find '$owner' in Azure Active Directory, cannot add them as an owner automatically to this new lab '$DevTestLabName' "
-            }
-            else {
-                # Found the user, but might have a list
-                if ($userPrinciple.Count -gt 0) {
-                    $spid = $userPrinciple[0].Id.Guid
-                }
-                else {
-                    $spid = $userPrinciple.Id.Guid
-                }
-
-                New-AzureRmRoleAssignment -ObjectId $spid -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
-                Write-Output "Added '$owneremail' as Lab Owner to this new lab '$DevTestLabName'"
+            try {
+              New-AzureRmRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
+              Write-Output "Added '$owneremail' as Lab Owner to this new lab '$DevTestLabName'"
+            } catch {
+              Write-Output $_.Exception.Message
             }
         }
 
 
         # Add all the lab users to the lab
         foreach ($useremail in $LabUsers) {
-            $userPrinciple = Get-AzureRmADUser -Mail $useremail
-
-            if ($userPrinciple.Count -eq $null) {
-                Write-Output "unable to find '$user' in Azure Active Directory, cannot add them as a DevTest Lab User automatically to this new lab '$DevTestLabName' , in this sector '$Sector'"
-            }
-            else {
-                # Found the user, but might have a list
-                if ($userPrinciple.Count -gt 0) {
-                    $spid = $userPrinciple[0].Id.Guid
-                }
-                else {
-                    $spid = $userPrinciple.Id.Guid
-                }
-
-                New-AzureRmRoleAssignment -ObjectId $spid -RoleDefinitionName 'DevTest Labs User' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
-                Write-Output "Added '$useremail' as DevTest Lab user to this new lab '$DevTestLabName'"
-            }
-        }
+          try {
+            New-AzureRmRoleAssignment -SignInName $useremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
+            Write-Output "Added '$useremail' as Lab Owner to this new lab '$DevTestLabName'"
+          } catch {
+            Write-Output $_.Exception.Message
+          }
+      }
 
         Write-Output "Completed Creating the '$DevTestLabName' lab"
     }
