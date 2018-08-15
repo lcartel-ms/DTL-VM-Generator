@@ -84,8 +84,8 @@ if ($error.Count -eq 0) {
         # Add all the lab users to the lab
         foreach ($useremail in $LabUsers) {
           try {
-            New-AzureRmRoleAssignment -SignInName $useremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
-            Write-Output "Added '$useremail' as Lab Owner to this new lab '$DevTestLabName'"
+            New-AzureRmRoleAssignment -SignInName $useremail -RoleDefinitionName 'User' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
+            Write-Output "Added '$useremail' as Lab User to this new lab '$DevTestLabName'"
           } catch {
             Write-Output $_.Exception.Message
           }
