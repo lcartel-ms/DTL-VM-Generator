@@ -42,7 +42,7 @@
         "labSubnetName": "[variables('labSubnetName')]",
         "disallowPublicIpAddress": false,
         "storageType": "[parameters('storageType')]",
-        "allowClaim": true,
+        "allowClaim": false,
         "customImageId":"[parameters('customImage')]"
       }
     }

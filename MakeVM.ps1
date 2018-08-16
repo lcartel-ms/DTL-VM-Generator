@@ -48,5 +48,13 @@ else {
     }
     Remove-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deployName  -ErrorAction SilentlyContinue | Out-Null
 
-    return $vmName
+    $devTestLab = Get-AzureRmResource -ResourceType 'Microsoft.DevTestLab/labs' -Name $DevTestLabName
+    $returnStatus = Invoke-AzureRmResourceAction -ResourceId "$($devTestLab.ResourceId)/virtualmachines/$vmName" -Action "stop" -Force
+    
+    if ($returnStatus.Status -eq 'Succeeded') {
+        Write-Output "Successfully stopped $vmName"
+    }
+    else {
+        Write-Error "##[error]Failed to stop $vmName"
+    }   
 }
