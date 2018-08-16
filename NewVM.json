@@ -40,7 +40,7 @@
         "size": "[parameters('size')]",
         "isAuthenticationWithSshKey": false,
         "labSubnetName": "[variables('labSubnetName')]",
-        "disallowPublicIpAddress": false,
+        "disallowPublicIpAddress": true,
         "storageType": "[parameters('storageType')]",
         "allowClaim": false,
         "customImageId":"[parameters('customImage')]"

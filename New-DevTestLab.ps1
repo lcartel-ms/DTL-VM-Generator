@@ -71,12 +71,12 @@ if ($error.Count -eq 0) {
         Remove-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName  -ErrorAction SilentlyContinue | Out-Null
 
         # Split if multiple emails
-        if($LabOwners -is [string]) {
+        if($LabOwners) {
             $ownAr = $LabOwners.Split(",").Trim()
         } else {
             $ownAr = $LabOwners
         }
-        if($LabUsers -is [string]) {
+        if($LabUsers) {
             $userAr = $LabUsers.Split(",").Trim()
         } else {
             $userAr = $LabUsers
