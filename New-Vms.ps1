@@ -26,13 +26,13 @@ $ErrorActionPreference = 'Continue'
 $scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
 
 # Check we're in the right directory
-if (-not (Test-Path (Join-Path $scriptFolder "MakeVM.ps1"))) {
-  Write-Error "Unable to find the New-DevTestLab.json template...  unable to proceed."
+if (-not (Test-Path (Join-Path $scriptFolder "New-Vm.ps1"))) {
+  Write-Error "Unable to find the New-Vm.ps1 template...  unable to proceed."
   return
 }
 
-if (-not (Test-Path (Join-Path $scriptFolder "NewVM.json"))) {
-  Write-Error "Unable to find the New-DevTestLab.json template...  unable to proceed."
+if (-not (Test-Path (Join-Path $scriptFolder "New-VM.json"))) {
+  Write-Error "Unable to find the New-VM.json template...  unable to proceed."
   return
 }
 
@@ -49,9 +49,9 @@ if ($lab -eq $null) {
     Write-Error "'$DevTestLabName' Lab doesn't exist, can't create VMs in it"
 }
 
-$makeVmScriptLocation = Join-Path $scriptFolder "MakeVM.ps1"
+$makeVmScriptLocation = Join-Path $scriptFolder "New-Vm.ps1"
 
-$templatePath = Join-Path $scriptFolder "NewVM.json"
+$templatePath = Join-Path $scriptFolder "New-VM.json"
 
 $jobs = @()
 

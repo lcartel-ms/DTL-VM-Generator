@@ -12,11 +12,11 @@ param
 $error.Clear()
 
 $scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
-$executable = Join-Path $scriptFolder "RemoveLab.ps1"
+$executable = Join-Path $scriptFolder "Remove-Lab.ps1"
 
 # Check we're in the right directory
 if (-not (Test-Path $executable)) {
-  Write-Error "Unable to find RemoveLab.ps1...  unable to proceed."
+  Write-Error "Unable to find Remove-Lab.ps1...  unable to proceed."
   return
 }
 

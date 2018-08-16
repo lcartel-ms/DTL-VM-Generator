@@ -32,7 +32,7 @@ $scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
 
 # Check we're in the right directory
 if (-not (Test-Path (Join-Path $scriptFolder "CreateImageFromVHD.json"))) {
-  Write-Error "Unable to find the New-DevTestLab.json template...  unable to proceed."
+  Write-Error "Unable to find the CreateImageFromVHD.json template...  unable to proceed."
   return
 }
 
