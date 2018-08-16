@@ -51,7 +51,7 @@ if ($lab -eq $null) {
 
 $makeVmScriptLocation = Join-Path $scriptFolder "New-Vm.ps1"
 
-$templatePath = Join-Path $scriptFolder "New-VM.json"
+$templatePath = Join-Path $scriptFolder "NewVM.json"
 
 $jobs = @()
 
