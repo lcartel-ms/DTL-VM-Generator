@@ -15,11 +15,11 @@ param
 $error.Clear()
 
 $scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
-$executable = Join-Path $scriptFolder "NewCustomLab.ps1"
+$executable = Join-Path $scriptFolder "New-CustomLab.ps1"
 
 # Check we're in the right directory
 if (-not (Test-Path $executable)) {
-  Write-Error "Unable to find NewCustomLab.ps1...  unable to proceed."
+  Write-Error "Unable to find New-CustomLab.ps1...  unable to proceed."
   return
 }
 
