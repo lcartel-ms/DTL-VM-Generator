@@ -70,9 +70,17 @@ if ($error.Count -eq 0) {
         # Remove Deployment
         Remove-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName  -ErrorAction SilentlyContinue | Out-Null
 
-        # Split if multiple emails (because of ps magic it works also if it is an array)
-        $ownAr = $LabOwners.Split(",").Trim()
-        $userAr = $LabUsers.Split(",").Trim()
+        # Split if multiple emails
+        if($LabOwners -is [string]) {
+            $ownAr = $LabOwners.Split(",").Trim()
+        } else {
+            $ownAr = $LabOwners
+        }
+        if($LabUsers -is [string]) {
+            $userAr = $LabUsers.Split(",").Trim()
+        } else {
+            $userAr = $LabUsers
+        }
 
         # Add all the lab owners to the lab
         foreach ($owneremail in $ownAr) {
