@@ -31,8 +31,8 @@ if (-not (Test-Path (Join-Path $scriptFolder "New-Vm.ps1"))) {
   return
 }
 
-if (-not (Test-Path (Join-Path $scriptFolder "New-VM.json"))) {
-  Write-Error "Unable to find the New-VM.json template...  unable to proceed."
+if (-not (Test-Path (Join-Path $scriptFolder "NewVM.json"))) {
+  Write-Error "Unable to find the NewVM.json template...  unable to proceed."
   return
 }
 
