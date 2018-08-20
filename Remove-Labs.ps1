@@ -27,7 +27,7 @@ $jobs = @()
 ForEach ($lab in $config) {
   Write-Output "Starting job to delete a lab named $($lab.DevTestLabName)"
   $jobs += Start-Job -Name $lab.DevTestLabName -FilePath $executable -ArgumentList $lab.DevTestLabName, $lab.ResourceGroupName
-  Start-Sleep -Seconds 60
+  Start-Sleep -Seconds 30
 }
 
 $jobCount = $jobs.Count
