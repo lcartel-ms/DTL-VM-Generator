@@ -1,0 +1,11 @@
+DevTestLabName,ResourceGroupName,StorageAccountName,StorageContainerName,StorageAccountKey,ShutDownTime,TimezoneId,LabRegion,LabOwners,LabUsers
+Cybi1,Cyber,storageAccount,containerName,"StorageKey", 1900, "W. Europe Standard Time", westeurope, "lucasbol@microsoft.com", "lucasbol@microsoft.com,lucasbol2@microsoft.com"
+Cybi2,Cyber,storageAccount,containerName,"StorageKey", 1900, "W. Europe Standard Time", westeurope, "lucasbol@microsoft.com", "lucasbol@microsoft.com,lucasbol2@microsoft.com"
+Cybi3,Cyber,storageAccount,containerName,"StorageKey", 1900, "W. Europe Standard Time", westeurope, "lucasbol@microsoft.com", "lucasbol@microsoft.com,lucasbol2@microsoft.com"
+Cybi4,Cyber,storageAccount,containerName,"StorageKey", 1900, "W. Europe Standard Time", westeurope, "lucasbol@microsoft.com", "lucasbol@microsoft.com,lucasbol2@microsoft.com"
+Cybi5,Cyber,storageAccount,containerName,"StorageKey", 1900, "W. Europe Standard Time", westeurope, "lucasbol@microsoft.com", "lucasbol@microsoft.com,lucasbol2@microsoft.com"
+Cybi6,Cyber,storageAccount,containerName,"StorageKey", 1900, "W. Europe Standard Time", westeurope, "lucasbol@microsoft.com", "lucasbol@microsoft.com,lucasbol2@microsoft.com"
+Cybi7,Cyber,storageAccount,containerName,"StorageKey", 1900, "W. Europe Standard Time", westeurope, "lucasbol@microsoft.com", "lucasbol@microsoft.com,lucasbol2@microsoft.com"
+Cybi8,Cyber,storageAccount,containerName,"StorageKey", 1900, "W. Europe Standard Time", westeurope, "lucasbol@microsoft.com", "lucasbol@microsoft.com,lucasbol2@microsoft.com"
+Cybi9,Cyber,storageAccount,containerName,"StorageKey", 1900, "W. Europe Standard Time", westeurope, "lucasbol@microsoft.com", "lucasbol@microsoft.com,lucasbol2@microsoft.com"
+Cybi10,Cyber,storageAccount,containerName,"StorageKey", 1900, "W. Europe Standard Time", westeurope, "lucasbol@microsoft.com", "lucasbol@microsoft.com,lucasbol2@microsoft.com"
