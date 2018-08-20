@@ -21,5 +21,5 @@ The repo also contains scripts which might have value on their own to build slig
 * [Login-AzSub.ps1](./Login-AzSub.ps1) log into Azure with a specific subId.
 * [Get-NAgoCommandTime.ps1](./Get-NAgoCommandTime.ps1) gives the execution time for the command executed N commands ago (default last command).
 * [Remove-Labs.ps1](./Remove-Labs.ps1) removes all the labs described in the configuration csv file.
-* [Remove-Lab.ps1](./Remove-Lab.ps1) remove one specific lab.
-* [Remove-Deployments.ps1](./Remove-Deployments.ps1) remmove all deployments in a resource group starting N days ago.
+* [Remove-Lab.ps1](./Remove-Lab.ps1) removes one specific lab.
+* [Remove-Deployments.ps1](./Remove-Deployments.ps1) removes all deployments in a resource group starting N days ago.
