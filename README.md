@@ -1,7 +1,7 @@
 # Create DevTest Labs from a storage of custom images
 The main script takes as input a csv file for creating multiple DevTest Labs from an Azure Blob storage containing VHDs and json descriptors. The script creates the labs, add the VHDs as custom images and creates one claimable VM for each custom image.
 
-Additionally you can set owners and users for such labs together with additional data like shutdown time, region and such.
+Additionally you can set owners and users for such labs together with additional data like shutdown time, region and such. The users added to the lab have no permissions to create new VMs, so that the content of the lab is fixed.
 
 The script creates the labs in paralllel with a new powershell process for each lab in a minimized window for easy tracking. It also automatically generates log files errors and opens them up at the end of execution. 
 
