@@ -45,6 +45,21 @@ if (-not (Test-Path (Join-Path $PSScriptRoot "New-DevTestLab.json"))) {
     return
 }
 
+# Add a custom role that doesn't have permission to create new VMs
+$customRole = "No VM Creation User"
+if(-not (Get-AzureRmRoleDefinition -Name $customRole)) {
+    $tmp = New-TemporaryFile
+    $text = (Get-Content -Path ".\NoVMCreationRole.json" -ReadCount 0) -join "`n"
+    $subId = (Get-AzureRmContext).Subscription.Id
+    Write-Output "Current subId $subId"
+    $text -replace '__subscription__', $subId | Set-Content -Path $tmp.FullName
+    # All of the above because someone thought that taking an input file, instead of text, is a good idea
+    New-AzureRmRoleDefinition -InputFile $tmp.FullName
+    Write-Output "Created $customRole from $($tmp.FullName)"
+} else {
+    Write-Output "Custom Role $customRole already present"
+}
+
 # lets only proceed if we don't have any errors...
 if ($error.Count -eq 0) {
 
@@ -90,8 +105,8 @@ if ($error.Count -eq 0) {
 
         # Add all the lab users to the lab
         foreach ($useremail in $userAr) {
-          New-AzureRmRoleAssignment -SignInName $useremail -RoleDefinitionName 'DevTest Labs User' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
-          Write-Output "Added '$useremail' as Lab User to this new lab '$DevTestLabName'"
+          New-AzureRmRoleAssignment -SignInName $useremail -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
+          Write-Output "Added '$useremail' as $customRole to this new lab '$DevTestLabName'"
       }
 
         Write-Output "Completed Creating the '$DevTestLabName' lab"
