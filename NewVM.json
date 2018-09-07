@@ -43,7 +43,17 @@
         "disallowPublicIpAddress": true,
         "storageType": "[parameters('storageType')]",
         "allowClaim": true,
-        "customImageId":"[parameters('customImage')]"
+        "customImageId":"[parameters('customImage')]",
+        "networkInterface": {
+            "sharedPublicIpAddressConfiguration": {
+                "inboundNatRules": [
+                    {
+                        "transportProtocol": "tcp",
+                        "backendPort": 3389
+                    }
+                ]
+            }
+        }
       }
     }
   ],
