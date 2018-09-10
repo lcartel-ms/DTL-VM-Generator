@@ -41,7 +41,7 @@
       "name": "[parameters('devTestLabName')]",
       "location": "[parameters('region')]",
       "properties": {
-        "labStorageType": "Standard"
+        "labStorageType": "Premium"
       },
       "resources": [
         {
