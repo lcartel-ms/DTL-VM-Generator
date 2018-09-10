@@ -10,6 +10,7 @@ profile.json
 
 #exclude config files
 config.csv
+configTest.csv
 
 *.xml
 
