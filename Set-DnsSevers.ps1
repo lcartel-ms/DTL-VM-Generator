@@ -60,8 +60,7 @@ foreach($descr in $VMDescriptors) {
     }
     Write-Output "Found the NIC ..."
 
-    $privateIp = $nic.IpConfigurations[0].PrivateIpAddress
-    $dnsServersHash.add($vmName, $privateIp)
+    $nic.IpConfigurations | ForEach-Object {$_.PrivateIpAddress} | ForEach-Object {$dnsServersHash.Add($vmName, $_)}
   }
 }
 
