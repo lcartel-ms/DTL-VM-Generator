@@ -33,7 +33,11 @@ Write-Output "Error logs for this run are in logs/ and contain the string $dates
 
 $config = Import-Csv $ConfigFile
 
+# Creates error folder if it doesn't exist
 $errorFolder = Join-Path $scriptFolder "logs\"
+if(!(Test-Path -Path $errorFolder )){
+  New-Item -ItemType directory -Path $errorFolder
+}
 
 $procs = @()
 
