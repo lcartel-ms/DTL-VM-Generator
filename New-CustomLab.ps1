@@ -38,8 +38,10 @@ $scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
 $newLab = Join-Path $scriptFolder "New-DevTestLab.ps1"
 $copyImages = Join-Path $scriptFolder "New-CustomImagesFromStorage.ps1"
 $createVMs = Join-Path $scriptFolder "New-Vms.ps1"
+$setDnsServers = Join-Path $scriptFolder "Set-DnsServers.ps1"
 
 & $newLab -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -ShutDownTime $ShutDownTime -TimeZoneId $TimeZoneId -LabRegion $LabRegion -LabOwners $LabOwners -LabUsers $LabUsers
 & $copyImages -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
 & $createVMs -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
+& $setDnsServers -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
 

@@ -32,50 +32,15 @@ if(-not ($VMDescriptors.count -gt 0)) {
 # Get all VMs in lab expanding properties to get to compute VM
 $vms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName -ExpandProperties -Name "$DevTestLabName/"
 
-Write-Output "Looking for the DNS Servers ..."
+# Cache DNSs and NICs
 $dnsServersHash = @{}
-foreach($descr in $VMDescriptors) {
-  $vmName = $descr.imageName
-  $dnsServer = $descr.dnsServer
+$nonDnsHash = @{}
+$nicsHash = @{}
 
-  # It is a DNS Server because no dns server has been specified for it
-  if(-not $dnsServer) {
-    Write-Output "Processing DNS $vmName ..."
+$VMDescriptors | ForEach-Object {
+  $vmName = $_.imageName
+  $dnsServer = $_.dnsServer
 
-    # Find the VM
-    $vm = $vms | Where-Object {$_.Name -eq $vmName}
-    if(-not $vm) {
-      Write-Error "Can't find VM named $vmName in lab $DevTestLabName in RG $ResourceGroupName"
-    }
-
-    # DANGER: this is implementation specific. Might change if DTL Changes how it stores compute info.
-    $computeGroup = ($vm.Properties.ComputeId -split "/")[4]
-    $vmName = ($vm.Properties.ComputeId -split "/")[8]
-
-    # DANGER: it could be implemented more safely by first getting the VM and then get the NIC for the VM, but it's one more network roundtrip ...
-    # As it happens, as of today the NIC has the same name as the VM ...
-    $nic = Get-AzureRmNetworkInterface -Name $vmName -ResourceGroupName $computeGroup
-    if(-not $nic) {
-      Write-Error "Can't find the NIC named $vmName in the compute group $computeGroup"
-    }
-    Write-Output "Found the NIC ..."
-
-    $nic.IpConfigurations | ForEach-Object {$_.PrivateIpAddress} | ForEach-Object {$dnsServersHash.Add($vmName, $_)}
-  }
-}
-
-if($dnsServersHash.count -eq 0) {
-  Write-Error "Found no DNS Servers??"
-}
-Write-Output $dnsServersHash
-
-Write-Output "Assigning DNS Servers to VMs ..."
-foreach($descr in $VMDescriptors) {
-
-  $vmName = $descr.imageName
-  $dnsServer = $descr.dnsServer
-
-  Write-Output "Processing $vmName ..."
   # Find the VM
   $vm = $vms | Where-Object {$_.Name -eq $vmName}
   if(-not $vm) {
@@ -92,18 +57,41 @@ foreach($descr in $VMDescriptors) {
   if(-not $nic) {
     Write-Error "Can't find the NIC named $vmName in the compute group $computeGroup"
   }
-  Write-Output "Found the NIC ..."
+  Write-Output "Found the NIC for $vmName ..."
 
-  if($dnsServer) { # It is not a DNS Server, assign it to the right $dnsServer
-    $ip = $dnsServersHash[$dnsServer]
-    if(-not $ip) {
-      Write-Error "Not found IP for DNS Server $dnsServer."
-    }
-    $nic.DnsSettings.DnsServers.Add($ip)
-    $nic | Set-AzureRmNetworkInterface | Out-Null
-    Write-Output "Set DNS for $vmName to $ip"
-  } else { # It is a DNS Server, move it to static allocation method
+  $ip = $nic.IpConfigurations | ForEach-Object {$_.PrivateIpAddress}
+  if(-not $dnsServer) {
+    $dnsServersHash.Add($vmName, $ip)
+  } else {
+    $nonDnsHash.Add($vmName, $dnsServer)
+  }
+  $nicsHash.add($vmName, $nic)
+}
+
+Write-Output "DNS:"
+if($dnsServersHash.count -eq 0) {
+  Write-Error "Found no DNS Servers??"
+}
+Write-Output $dnsServersHash
+
+if($nicsHash.count -eq 0) {
+  Write-Error "Found no NICS??"
+}
+Write-Output "Number of NICS: $($nicsHash.Count)"
+
+# Act on each NIC depending if it's a dns server or not
+$nicsHash.Keys | ForEach-Object {
+  # If it is in the DNS hash, then it is a dns
+  $isDns = $dnsServersHash[$_]
+  $nic = $nicsHash[$_]
+  if($isDns) {
     $nic.IpConfigurations[0].PrivateIpAllocationMethod = "Static"
-    Write-Output "Set NIC for $vmName to static allocation because it is a dns server"
+    Write-Output "Set NIC for $_ to static allocation because it is a dns server"
+  } else {
+    $dnsName = $nonDnsHash[$_]
+    $dnsIp = $dnsServersHash[$dnsName]
+    $nic.DnsSettings.DnsServers.Add($dnsIp)
+    $nic | Set-AzureRmNetworkInterface | Out-Null
+    Write-Output "Set DNS for $_ to $dnsName ($dnsIp)"
   }
 }

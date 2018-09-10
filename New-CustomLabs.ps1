@@ -14,6 +14,10 @@ param
 # Clear the errors up front-  helps when running the script multiple times
 $error.Clear()
 
+# Is the below line going to make it check for errors in the spawn processes even when an error on this one?
+# I am really unconfortable with PS error model ...
+$ErrorActionPreference = 'Continue'
+
 $scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
 $executable = Join-Path $scriptFolder "New-CustomLab.ps1"
 
