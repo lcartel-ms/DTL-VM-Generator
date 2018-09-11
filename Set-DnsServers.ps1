@@ -32,9 +32,7 @@ if(-not ($VMDescriptors.count -gt 0)) {
 # Get all VMs in lab expanding properties to get to compute VM
 $vms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName -ExpandProperties -Name "$DevTestLabName/"
 
-# Cache DNSs and NICs
-$dnsServersHash = @{}
-$nonDnsHash = @{}
+# Needs to run first through all the vms to get the private ip for the dns servers
 $nicsHash = @{}
 
 $VMDescriptors | ForEach-Object {
@@ -60,38 +58,28 @@ $VMDescriptors | ForEach-Object {
   Write-Output "Found the NIC for $vmName ..."
 
   $ip = $nic.IpConfigurations | ForEach-Object {$_.PrivateIpAddress}
-  if(-not $dnsServer) {
-    $dnsServersHash.Add($vmName, $ip)
-  } else {
-    $nonDnsHash.Add($vmName, $dnsServer)
-  }
-  $nicsHash.add($vmName, $nic)
-}
 
-Write-Output "DNS:"
-if($dnsServersHash.count -eq 0) {
-  Write-Error "Found no DNS Servers??"
+  $nicsHash.add($vmName, @{'nic' = $nic; 'dnsServer' = $dnsServer;'ip' = $ip})
 }
-Write-Output $dnsServersHash
 
 if($nicsHash.count -eq 0) {
   Write-Error "Found no NICS??"
 }
-Write-Output "Number of NICS: $($nicsHash.Count)"
 
 # Act on each NIC depending if it's a dns server or not
 $nicsHash.Keys | ForEach-Object {
-  # If it is in the DNS hash, then it is a dns
-  $isDns = $dnsServersHash[$_]
-  $nic = $nicsHash[$_]
+  $value = $nicsHash[$_]
+  $isDns = -not $value.dnsServer
+  $nic = $value.nic
+
   if($isDns) {
     $nic.IpConfigurations[0].PrivateIpAllocationMethod = "Static"
-    Write-Output "Set NIC for $_ to static allocation because it is a dns server"
+    Write-Output "$_`t-> static allocation"
   } else {
-    $dnsName = $nonDnsHash[$_]
-    $dnsIp = $dnsServersHash[$dnsName]
+    $dnsName = $value.dnsServer
+    $dnsIp = $nicsHash[$dnsName].ip
     $nic.DnsSettings.DnsServers.Add($dnsIp)
     $nic | Set-AzureRmNetworkInterface | Out-Null
-    Write-Output "Set DNS for $_ to $dnsName ($dnsIp)"
+    Write-Output "$_`t-> $dnsName`t$dnsIp"
   }
 }
