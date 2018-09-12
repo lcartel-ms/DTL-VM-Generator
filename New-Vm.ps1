@@ -1,8 +1,5 @@
 param
 (
-    [Parameter(Mandatory=$true, HelpMessage="The full path of the profile file")]
-    [string] $ProfilePath,
-
     [Parameter(Mandatory=$true, HelpMessage="The full path of the template file")]
     [string] $TemplateFilePath,
 
@@ -27,8 +24,6 @@ param
     [Parameter(Mandatory=$true, HelpMessage="Notes on the VM")]
     [string] $notes
 )
-
-Import-AzureRmContext -Path $ProfilePath
 
 Write-Output "Starting Deploy for $vmName"
 

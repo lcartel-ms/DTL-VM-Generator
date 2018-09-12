@@ -6,3 +6,4 @@ param
 
 Connect-AzureRmAccount
 Set-AzureRmContext -SubscriptionId $SubscriptionId
+Enable-AzureRmContextAutosave -Scope CurrentUser

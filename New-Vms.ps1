@@ -7,17 +7,6 @@ param
     [string] $ResourceGroupName
 )
 
-function SaveProfile {
-  $profilePath = Join-Path $PSScriptRoot "profile.json"
-
-  If (Test-Path $profilePath){
-    Remove-Item $profilePath
-  }
-  Save-AzureRmContext -Path $profilePath -Force
-
-  return $profilePath
-}
-
 # Clear the errors up front-  helps when running the script multiple times
 $error.Clear()
 
@@ -55,8 +44,6 @@ $templatePath = Join-Path $scriptFolder "NewVM.json"
 
 $jobs = @()
 
-$profilePath = SaveProfile
-
 # Needed for full image id creation
 $SubscriptionID = (Get-AzureRmContext).Subscription.Id
 
@@ -69,7 +56,7 @@ foreach($descr in $VMDescriptors) {
   $vmName = $descr.imageName
 
   Write-Output "Starting job to create a VM named $vmName"
-  $jobs += Start-Job -Name $file.Name -FilePath $makeVmScriptLocation -ArgumentList $profilePath, $templatePath, $DevTestLabName, $ResourceGroupName, $vmName, $descr.size, $descr.storageType, $imageName, $descr.description
+  $jobs += Start-Job -Name $file.Name -FilePath $makeVmScriptLocation -ArgumentList $templatePath, $DevTestLabName, $ResourceGroupName, $vmName, $descr.size, $descr.storageType, $imageName, $descr.description
 }
 
 $jobCount = $jobs.Count

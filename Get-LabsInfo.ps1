@@ -16,25 +16,12 @@ if (-not (Test-Path $executable)) {
   return
 }
 
-function SaveProfile {
-  $profilePath = Join-Path $PSScriptRoot "profile.json"
-
-  If (Test-Path $profilePath){
-    Remove-Item $profilePath
-  }
-  Save-AzureRmContext -Path $profilePath -Force
-
-  return $profilePath
-}
-
-$profilePath = SaveProfile
-
 $config = Import-Csv $ConfigFile
 
 $jobs = @()
 
 ForEach ($lab in $config) {
-  $jobs += Start-Job -Name $lab.DevTestLabName -FilePath $executable -ArgumentList $profilePath, $lab.DevTestLabName, $lab.ResourceGroupName
+  $jobs += Start-Job -Name $lab.DevTestLabName -FilePath $executable -ArgumentList $lab.DevTestLabName, $lab.ResourceGroupName
 }
 
 $jobCount = $jobs.Count

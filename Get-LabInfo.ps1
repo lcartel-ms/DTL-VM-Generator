@@ -1,7 +1,5 @@
 param
 (
-  [Parameter(Mandatory=$true, HelpMessage="The full path of the profile file")]
-  [string] $ProfilePath,
 
   [Parameter(Mandatory=$true, HelpMessage="Name of lab to query")]
   [string] $DevTestLabName,
@@ -12,8 +10,6 @@ param
 
 # HACK: Get-AzureRmResource gives me a wrong error I can't get rid off. You try ...
 $ErrorActionPreference = "SilentlyContinue"
-
-Import-AzureRmContext -Path $ProfilePath | Out-Null
 
 # Get all VMs in lab expanding properties to get to compute VM
 $vms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName -ExpandProperties -Name "$DevTestLabName/"
