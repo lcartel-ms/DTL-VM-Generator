@@ -46,11 +46,10 @@ $VMDescriptors | ForEach-Object {
   }
 
   # DANGER: this is implementation specific. Might change if DTL Changes how it stores compute info.
-  $computeGroup = ($vm.Properties.ComputeId -split "/")[4]
-  $vmName = ($vm.Properties.ComputeId -split "/")[8]
+  $computeVm = Get-AzureRmResource -ResourceId $vm.Properties.computeId
+  $computeGroup = $computeVm.ResourceGroupName
+  $name = $computeVm.Name
 
-  # DANGER: it could be implemented more safely by first getting the VM and then get the NIC for the VM, but it's one more network roundtrip ...
-  # As it happens, as of today the NIC has the same name as the VM ...
   $nic = Get-AzureRmNetworkInterface -Name $vmName -ResourceGroupName $computeGroup
   if(-not $nic) {
     Write-Error "Can't find the NIC named $vmName in the compute group $computeGroup"

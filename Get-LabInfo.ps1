@@ -16,12 +16,19 @@ $vms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachi
 $runningVms = @()
 
 foreach ($vm in $vms) {
-  $computeGroup = ($vm.Properties.ComputeId -split "/")[4]
-  $name = ($vm.Properties.ComputeId -split "/")[8]
-  $compVM = Get-AzureRmVM -ResourceGroupName $computeGroup -name $name -Status
-  $status = $compVM.Statuses.Code[1]
+  $computeVm = Get-AzureRmResource -ResourceId $vm.Properties.computeId
+  $computeGroup = $computeVm.ResourceGroupName
+  $name = $computeVm.Name
 
-  if($status -eq "PowerState/running") {
+  $compVM = Get-AzureRmVM -ResourceGroupName $computeGroup -name $name -Status
+
+  $isRunning = $false
+  $compVM.Statuses | ForEach-Object {
+            if ($_.Code -eq 'PowerState/running') {
+              $isRunning = $true
+            }
+      }
+  if($isRunning) {
     $runningVms += $vm.Name
   }
 }
