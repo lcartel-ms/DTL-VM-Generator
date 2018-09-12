@@ -1,19 +1,17 @@
 param
 (
-  [Parameter(Mandatory=$true, HelpMessage="The full path of the profile file")]
-  [string] $ProfilePath,
-
-  [Parameter(Mandatory=$true, HelpMessage="Name of lab to query")]
+  [Parameter(Mandatory=$true, HelpMessage="Name of lab to stop VMs into")]
   [string] $DevTestLabName,
 
-  [Parameter(Mandatory=$true, HelpMessage="RG of lab to query")]
+  [Parameter(Mandatory=$true, HelpMessage="RG of lab to stop VMs into")]
   [string] $ResourceGroupName
 )
 
 # HACK: Get-AzureRmResource gives me a wrong error I can't get rid off. You try ...
 $ErrorActionPreference = "SilentlyContinue"
 
-Import-AzureRmContext -Path $ProfilePath | Out-Null
+Write-Output "Stopping VMs in $DevTestLabName in RG $ResourceGroupName ..."
+Write-Output "This might take a while ..."
 
 # Get all VMs in lab expanding properties to get to compute VM
 $vms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName -ExpandProperties -Name "$DevTestLabName/"
@@ -25,10 +23,16 @@ foreach ($vm in $vms) {
   $compVM = Get-AzureRmVM -ResourceGroupName $computeGroup -name $name -Status
   $status = $compVM.Statuses.Code[1]
 
+  $dtlName = $vm.Name
+
   if($status -eq "PowerState/running") {
-    $runningVms += $vm.Name
+    $returnStatus = Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "stop" -Force
+
+    if ($returnStatus.Status -eq 'Succeeded') {
+      Write-Output "Successfully stopped DTL machine: $dtlName"
+    }
+    else {
+      Write-Error "Failed to stop DTL machine: $dtlName"
+    }
   }
 }
-
-$runString = $runningVms -join " "
-Write-Output "$DevTestLabName : $runningVms"
