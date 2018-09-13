@@ -27,10 +27,6 @@ if (-not (Test-Path $executable)) {
   return
 }
 
-# Create Unique string for error files
-$dateString = get-date -f "-yyyy_MM_dd-HH_mm_ss"
-Write-Output "Error logs for this run are in logs/ and contain the string $datestring"
-
 $config = Import-Csv $ConfigFile
 
 # Creates error folder if it doesn't exist
@@ -44,15 +40,11 @@ $procs = @()
 $count = 1
 Write-Output "Starting processes to create labs in $WindowsStyle windows ..."
 ForEach ($lab in $config) {
-  $errorFile = $lab.DevTestLabName + $dateString + ".err.txt"
-  $errorFilePath = Join-Path $errorFolder $errorFile
-  $outputFile = $lab.DevTestLabName + $dateString + ".out.txt"
-  $outputFilePath = Join-Path $errorFolder $outputFilePath
 
   $argList = "-File ""$executable"" -DevTestLabName $($lab.DevTestLabName) -ResourceGroupName $($lab.ResourceGroupName) -StorageAccountName $($lab.StorageAccountName) -StorageContainerName $($lab.StorageContainerName) -StorageAccountKey ""$($lab.StorageAccountKey)"" -ShutDownTime $($lab.ShutDownTime) -TimeZoneId ""$($lab.TimeZoneId)"" -LabRegion ""$($lab.LabRegion)"" -LabOwners ""$($lab.LabOwners)"" -LabUsers ""$($lab.LabUsers)"""
 
   Write-Output "$count : Creating lab $($lab.DevTestLabName)"
-  $procs += Start-Process "powershell.exe" -PassThru -WindowStyle $WindowsStyle -RedirectStandardError $errorFilePath -RedirectStandardOutput $outputFilePath -ArgumentList $argList -WorkingDirectory $scriptFolder
+  $procs += Start-Process "powershell.exe" -PassThru -WindowStyle $WindowsStyle -ArgumentList $argList -WorkingDirectory $scriptFolder
   Start-Sleep -Seconds ($MinutesToNextLabCreation * 60)
   $count += 1
 }

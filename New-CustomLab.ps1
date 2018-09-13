@@ -35,10 +35,17 @@ Import-Module AzureRM.Profile
 
 $DebugPreference = "Continue"
 
-# Clear the errors up front-  helps when running the script multiple times
 $error.Clear()
 
+$dateString = get-date -f "-yyyy_MM_dd-HH_mm_ss"
 $scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
+$outputFolder = Join-Path $scriptFolder "logs\"
+
+$outputFile = $DevTestLabName + $dateString + ".txt"
+$outputFilePath = Join-Path $outputFolder $outputFile
+
+Start-Transcript -Path $outputFilePath -NoClobber -IncludeInvocationHeader
+
 $newLab = Join-Path $scriptFolder "New-DevTestLab.ps1"
 $copyImages = Join-Path $scriptFolder "New-CustomImagesFromStorage.ps1"
 $createVMs = Join-Path $scriptFolder "New-Vms.ps1"
@@ -49,4 +56,7 @@ $setDnsServers = Join-Path $scriptFolder "Set-DnsServers.ps1"
 & $createVMs -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
 & $setDnsServers -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
 
+Write-output  "Test"
 Resolve-AzureRmError
+
+Stop-Transcript
