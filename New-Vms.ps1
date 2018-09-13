@@ -57,6 +57,7 @@ foreach($descr in $VMDescriptors) {
 
   Write-Output "Starting job to create a VM named $vmName"
   $jobs += Start-Job -Name $file.Name -FilePath $makeVmScriptLocation -ArgumentList $templatePath, $DevTestLabName, $ResourceGroupName, $vmName, $descr.size, $descr.storageType, $imageName, $descr.description
+  Start-Sleep -Seconds 30
 }
 
 $jobCount = $jobs.Count
