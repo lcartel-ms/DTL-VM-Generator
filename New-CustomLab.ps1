@@ -31,6 +31,10 @@ param
     [string[]] $LabUsers = @()
 )
 
+Import-Module AzureRM.Profile
+
+$DebugPreference = "Continue"
+
 # Clear the errors up front-  helps when running the script multiple times
 $error.Clear()
 
@@ -45,3 +49,4 @@ $setDnsServers = Join-Path $scriptFolder "Set-DnsServers.ps1"
 & $createVMs -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
 & $setDnsServers -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
 
+Resolve-AzureRmError
