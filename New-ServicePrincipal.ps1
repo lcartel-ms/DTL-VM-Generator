@@ -36,5 +36,7 @@ Write-Output "Tenant Id: $($sub.TenantId)"
 Write-Output "Object Id: $($ServicePrincipal.Id)"
 Write-Output "--------------------------------------------------"
 
+Start-Sleep -Seconds 30
+
 New-AzureRmRoleAssignment -ObjectId $ServicePrincipal.Id -Scope "/subscriptions/$($sub.Id)" -RoleDefinitionName "Contributor"
 
