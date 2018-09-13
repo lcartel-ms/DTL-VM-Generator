@@ -35,13 +35,15 @@ if(!(Test-Path -Path $errorFolder )){
   New-Item -ItemType directory -Path $errorFolder
 }
 
+$dateString = get-date -f "-yyyy_MM_dd-HH_mm_ss"
+
 $procs = @()
 
 $count = 1
 Write-Output "Starting processes to create labs in $WindowsStyle windows ..."
 ForEach ($lab in $config) {
 
-  $argList = "-File ""$executable"" -DevTestLabName $($lab.DevTestLabName) -ResourceGroupName $($lab.ResourceGroupName) -StorageAccountName $($lab.StorageAccountName) -StorageContainerName $($lab.StorageContainerName) -StorageAccountKey ""$($lab.StorageAccountKey)"" -ShutDownTime $($lab.ShutDownTime) -TimeZoneId ""$($lab.TimeZoneId)"" -LabRegion ""$($lab.LabRegion)"" -LabOwners ""$($lab.LabOwners)"" -LabUsers ""$($lab.LabUsers)"""
+  $argList = "-DateString $dateString -File ""$executable"" -DevTestLabName $($lab.DevTestLabName) -ResourceGroupName $($lab.ResourceGroupName) -StorageAccountName $($lab.StorageAccountName) -StorageContainerName $($lab.StorageContainerName) -StorageAccountKey ""$($lab.StorageAccountKey)"" -ShutDownTime $($lab.ShutDownTime) -TimeZoneId ""$($lab.TimeZoneId)"" -LabRegion ""$($lab.LabRegion)"" -LabOwners ""$($lab.LabOwners)"" -LabUsers ""$($lab.LabUsers)"""
 
   Write-Output "$count : Creating lab $($lab.DevTestLabName)"
   $procs += Start-Process "powershell.exe" -PassThru -WindowStyle $WindowsStyle -ArgumentList $argList -WorkingDirectory $scriptFolder

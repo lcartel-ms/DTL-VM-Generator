@@ -1,5 +1,8 @@
 param
 (
+    [Parameter(Mandatory=$false, HelpMessage="Unique string representing the date")]
+    [string] $DateSTring = "-yyyy_MM_dd-HH_mm_ss",
+
     [Parameter(Mandatory=$true, HelpMessage="The Name of the new DevTest Lab")]
     [string] $DevTestLabName,
 
@@ -37,11 +40,10 @@ $DebugPreference = "Continue"
 
 $error.Clear()
 
-$dateString = get-date -f "-yyyy_MM_dd-HH_mm_ss"
 $scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
 $outputFolder = Join-Path $scriptFolder "logs\"
 
-$outputFile = $DevTestLabName + $dateString + ".txt"
+$outputFile = $DevTestLabName + $DateString + ".txt"
 $outputFilePath = Join-Path $outputFolder $outputFile
 
 Start-Transcript -Path $outputFilePath -NoClobber -IncludeInvocationHeader
@@ -58,10 +60,10 @@ $setDnsServers = Join-Path $scriptFolder "Set-DnsServers.ps1"
 
 if($error.Count -ne 0) {
   Resolve-AzureRmError
-  $errorFile = $DevTestLabName + $dateString + ".err.txt"
+  $errorFile = $DevTestLabName + $DateString + ".err.txt"
   $outputFilePath = Join-Path $outputFolder $errorFile
-  $error | Out-File
-  Resolve-AzureRmError | Out-File -Append
+  $error | Out-File $outputFilePath
+  Resolve-AzureRmError | Out-File $outputFilePath -Append
 }
 
 Stop-Transcript
