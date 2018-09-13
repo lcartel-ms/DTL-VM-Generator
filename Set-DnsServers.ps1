@@ -7,9 +7,6 @@ param
     [string] $ResourceGroupName
 )
 
-# Clear the errors up front-  helps when running the script multiple times
-$error.Clear()
-
 Write-Output "Starting DNS setting ..."
 
 $ErrorActionPreference = 'Continue'

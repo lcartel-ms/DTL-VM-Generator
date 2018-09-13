@@ -23,9 +23,6 @@ param
 
 )
 
-# Clear the errors up front-  helps when running the script multiple times
-$error.Clear()
-
 if ($DevTestLabName.Length -gt 50) {
     Write-Output "DevTest Lab name is too long, must be 50 characters or less"
     return

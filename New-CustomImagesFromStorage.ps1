@@ -16,8 +16,6 @@
     [string] $StorageAccountKey
 )
 
-# Clear the errors up front-  helps when running the script multiple times
-$error.Clear()
 $ErrorActionPreference = 'Continue'
 
 

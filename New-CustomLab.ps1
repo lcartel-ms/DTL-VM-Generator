@@ -56,7 +56,12 @@ $setDnsServers = Join-Path $scriptFolder "Set-DnsServers.ps1"
 & $createVMs -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
 & $setDnsServers -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
 
-Write-output  "Test"
-Resolve-AzureRmError
+if($error.Count -ne 0) {
+  Resolve-AzureRmError
+  $errorFile = $DevTestLabName + $dateString + ".err.txt"
+  $outputFilePath = Join-Path $outputFolder $errorFile
+  $error | Out-File
+  Resolve-AzureRmError | Out-File -Append
+}
 
 Stop-Transcript
