@@ -12,11 +12,6 @@ $ErrorActionPreference = 'Continue'
 $scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
 
 # Check we're in the right directory
-if (-not (Test-Path (Join-Path $scriptFolder "New-Vm.ps1"))) {
-  Write-Error "Unable to find the New-Vm.ps1 template...  unable to proceed."
-  return
-}
-
 if (-not (Test-Path (Join-Path $scriptFolder "NewVM.json"))) {
   Write-Error "Unable to find the NewVM.json template...  unable to proceed."
   return
@@ -53,7 +48,7 @@ foreach($descr in $VMDescriptors) {
   $vmName = $descr.imageName
 
   Write-Output "Starting job to create a VM named $vmName"
-  #$jobs += Start-Job -Name $file.Name -FilePath $makeVmScriptLocation -ArgumentList $templatePath, $DevTestLabName, $ResourceGroupName, $vmName, $descr.size, $descr.storageType, $imageName, $descr.description
+
   $deployName = "Deploy-$DevTestLabName-$vmName"
   $jobs += New-AzureRmResourceGroupDeployment -AsJob -Name $deployName -ResourceGroupName $ResourceGroupName -TemplateFile $templatePath -labName $DevTestLabName -newVMName $vmName -size $descr.size -storageType $descr.storageType -customImage $imageName -notes $descr.description
 
