@@ -36,7 +36,7 @@ param
 
 Import-Module AzureRM.Profile
 
-$DebugPreference = "Continue"
+#$DebugPreference = "Continue"
 
 $error.Clear()
 
@@ -46,7 +46,7 @@ $outputFolder = Join-Path $scriptFolder "logs\"
 $outputFile = $DevTestLabName + $DateString + ".txt"
 $outputFilePath = Join-Path $outputFolder $outputFile
 
-Start-Transcript -Path $outputFilePath -NoClobber -IncludeInvocationHeader
+#Start-Transcript -Path $outputFilePath -NoClobber -IncludeInvocationHeader
 
 $newLab = Join-Path $scriptFolder "New-DevTestLab.ps1"
 $copyImages = Join-Path $scriptFolder "New-CustomImagesFromStorage.ps1"
@@ -66,4 +66,4 @@ if($error.Count -ne 0) {
   Resolve-AzureRmError | Out-File $outputFilePath -Append
 }
 
-Stop-Transcript
+#Stop-Transcript

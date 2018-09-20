@@ -53,8 +53,12 @@ foreach($descr in $VMDescriptors) {
   $vmName = $descr.imageName
 
   Write-Output "Starting job to create a VM named $vmName"
-  $jobs += Start-Job -Name $file.Name -FilePath $makeVmScriptLocation -ArgumentList $templatePath, $DevTestLabName, $ResourceGroupName, $vmName, $descr.size, $descr.storageType, $imageName, $descr.description
-  Start-Sleep -Seconds 30
+  #$jobs += Start-Job -Name $file.Name -FilePath $makeVmScriptLocation -ArgumentList $templatePath, $DevTestLabName, $ResourceGroupName, $vmName, $descr.size, $descr.storageType, $imageName, $descr.description
+  $deployName = "Deploy-$DevTestLabName-$vmName"
+  $jobs += New-AzureRmResourceGroupDeployment -AsJob -Name $deployName -ResourceGroupName $ResourceGroupName -TemplateFile $templatePath -labName $DevTestLabName -newVMName $vmName -size $descr.size -storageType $descr.storageType -customImage $imageName -notes $descr.description
+
+  $rndTimeout = Get-Random -Minimum 30 -Maximum 100
+  Start-Sleep -Seconds $rndTimeout
 }
 
 $jobCount = $jobs.Count
