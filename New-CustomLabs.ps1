@@ -49,17 +49,18 @@ $procs = @()
 
 $count = 1
 Write-Output "Starting processes to create labs in $WindowsStyle windows ..."
+
+if($Transcript) {
+  $trString = "-Transcript"
+}
+else {
+  $trString = ""
+}
+
 ForEach ($lab in $config) {
 
-  if($Transcript) {
-    $trString = "-Transcript"
-  }
-  else {
-    $trString = ""
-  }
-
   $argList = "-File ""$executable"" -DateString ""$dateString"" -DevTestLabName $($lab.DevTestLabName) -ResourceGroupName $($lab.ResourceGroupName) -StorageAccountName $($lab.StorageAccountName) -StorageContainerName $($lab.StorageContainerName) -StorageAccountKey ""$($lab.StorageAccountKey)"" -ShutDownTime $($lab.ShutDownTime) -TimeZoneId ""$($lab.TimeZoneId)"" -LabRegion ""$($lab.LabRegion)"" -LabOwners ""$($lab.LabOwners)"" -LabUsers ""$($lab.LabUsers)"" $trString"
-  Write-Output $argList
+
   Write-Output "$count : Creating lab $($lab.DevTestLabName)"
   $procs += Start-Process "powershell.exe" -PassThru -WindowStyle $WindowsStyle -ArgumentList $argList -WorkingDirectory $scriptFolder
   Start-Sleep -Seconds ($MinutesToNextLabCreation * 60)
