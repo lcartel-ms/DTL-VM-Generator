@@ -7,7 +7,10 @@ param
     [string] $WindowsStyle =  "Minimized",
 
     [Parameter(Mandatory=$false, HelpMessage="How many minutes to wait before starting the next parallel lab creation")]
-    [int] $MinutesToNextLabCreation =  2
+    [int] $MinutesToNextLabCreation =  2,
+
+    [Parameter(Mandatory=$false, HelpMessage="Creates a transcript of the execution in the logs folder")]
+    [switch] $Transcript
 
 )
 
@@ -48,8 +51,15 @@ $count = 1
 Write-Output "Starting processes to create labs in $WindowsStyle windows ..."
 ForEach ($lab in $config) {
 
-  $argList = "-File ""$executable"" -DateString ""$dateString"" -DevTestLabName $($lab.DevTestLabName) -ResourceGroupName $($lab.ResourceGroupName) -StorageAccountName $($lab.StorageAccountName) -StorageContainerName $($lab.StorageContainerName) -StorageAccountKey ""$($lab.StorageAccountKey)"" -ShutDownTime $($lab.ShutDownTime) -TimeZoneId ""$($lab.TimeZoneId)"" -LabRegion ""$($lab.LabRegion)"" -LabOwners ""$($lab.LabOwners)"" -LabUsers ""$($lab.LabUsers)"""
+  if($Transcript) {
+    $trString = "-Transcript"
+  }
+  else {
+    $trString = ""
+  }
 
+  $argList = "-File ""$executable"" -DateString ""$dateString"" -DevTestLabName $($lab.DevTestLabName) -ResourceGroupName $($lab.ResourceGroupName) -StorageAccountName $($lab.StorageAccountName) -StorageContainerName $($lab.StorageContainerName) -StorageAccountKey ""$($lab.StorageAccountKey)"" -ShutDownTime $($lab.ShutDownTime) -TimeZoneId ""$($lab.TimeZoneId)"" -LabRegion ""$($lab.LabRegion)"" -LabOwners ""$($lab.LabOwners)"" -LabUsers ""$($lab.LabUsers)"" $trString"
+  Write-Output $argList
   Write-Output "$count : Creating lab $($lab.DevTestLabName)"
   $procs += Start-Process "powershell.exe" -PassThru -WindowStyle $WindowsStyle -ArgumentList $argList -WorkingDirectory $scriptFolder
   Start-Sleep -Seconds ($MinutesToNextLabCreation * 60)
@@ -58,6 +68,8 @@ ForEach ($lab in $config) {
 
 Write-Output "Waiting for all processes to end"
 $procs | Wait-Process -Timeout (60 * 60 * 8)
+
+Remove-Item "Images$DateString.xml"
 
 # Check if there were errors by looking for the presence of error files
 if (Test-Path $errorFolder) {

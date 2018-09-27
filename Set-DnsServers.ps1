@@ -4,7 +4,10 @@ param
     [string] $DevTestLabName,
 
     [Parameter(Mandatory=$true, HelpMessage="The Name of the resource group to create the lab in")]
-    [string] $ResourceGroupName
+    [string] $ResourceGroupName,
+
+    [Parameter(Mandatory=$false, HelpMessage="Unique string representing the date")]
+    [string] $DateString = (get-date -f "-yyyy_MM_dd-HH_mm_ss")
 )
 
 Write-Output "Starting DNS setting ..."
@@ -24,7 +27,7 @@ if (-not (Test-Path (Join-Path $scriptFolder "foo.xml"))) {
 }
 
 # Import settings
-$VMDescriptors = Import-Clixml -Path .\foo.xml
+$VMDescriptors = Import-Clixml -Path "Images$DateString.xml"
 
 if(-not ($VMDescriptors.count -gt 0)) {
   Write-Error "VMDescriptors can't be null or empty"

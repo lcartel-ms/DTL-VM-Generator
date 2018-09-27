@@ -1,7 +1,7 @@
 param
 (
     [Parameter(Mandatory=$false, HelpMessage="Unique string representing the date")]
-    [string] $DateSTring = "-yyyy_MM_dd-HH_mm_ss",
+    [string] $DateString = (get-date -f "-yyyy_MM_dd-HH_mm_ss"),
 
     [Parameter(Mandatory=$true, HelpMessage="The Name of the new DevTest Lab")]
     [string] $DevTestLabName,
@@ -31,12 +31,17 @@ param
     [string[]] $LabOwners = @(),
 
     [Parameter(HelpMessage="The list of users (emails) that we need to add as lab users")]
-    [string[]] $LabUsers = @()
+    [string[]] $LabUsers = @(),
+
+    [Parameter(Mandatory=$false, HelpMessage="Creates a transcript of the execution in the logs folder")]
+    [switch] $Transcript
 )
 
 Import-Module AzureRM.Profile
 
-#$DebugPreference = "Continue"
+if($Transcript) {
+  $DebugPreference = "Continue"
+}
 
 $error.Clear()
 
@@ -51,20 +56,21 @@ $outputFolder = Join-Path $scriptFolder "logs\"
 $outputFile = $DevTestLabName + $DateString + ".txt"
 $outputFilePath = Join-Path $outputFolder $outputFile
 
-#Start-Transcript -Path $outputFilePath -NoClobber -IncludeInvocationHeader
+if($Transcript) {
+  Start-Transcript -Path $outputFilePath -NoClobber -IncludeInvocationHeader
+}
 
 $newLab             = Join-Path $scriptFolder "New-DevTestLab.ps1"
 $copyImages         = Join-Path $scriptFolder "New-CustomImagesFromStorage.ps1"
 $createVMs          = Join-Path $scriptFolder "New-Vms.ps1"
 $setDnsServers      = Join-Path $scriptFolder "Set-DnsServers.ps1"
-$removeSnapshots    = Join-Path $scriptFolder ".\Remove-SnapshotsForLab.ps1"
+$removeSnapshots    = Join-Path $scriptFolder "Remove-SnapshotsForLab.ps1"
 
 & $newLab           -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -ShutDownTime $ShutDownTime -TimeZoneId $TimeZoneId -LabRegion $LabRegion -LabOwners $LabOwners -LabUsers $LabUsers
-& $copyImages       -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
-& $createVMs        -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
-& $setDnsServers    -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
+& $copyImages       -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey -DateString $DateString
+& $createVMs        -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -DateString $DateString
+& $setDnsServers    -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -DateString $DateString
 & $removeSnapshots  -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
-
 
 if($error.Count -ne 0) {
   Resolve-AzureRmError
@@ -74,4 +80,6 @@ if($error.Count -ne 0) {
   Resolve-AzureRmError | Out-File $outputFilePath -Append
 }
 
-#Stop-Transcript
+if($Transcript) {
+  Stop-Transcript
+}

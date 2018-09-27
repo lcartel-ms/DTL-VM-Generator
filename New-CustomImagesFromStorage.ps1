@@ -13,7 +13,10 @@
     [string] $StorageContainerName,
 
     [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
-    [string] $StorageAccountKey
+    [string] $StorageAccountKey,
+
+    [Parameter(Mandatory=$false, HelpMessage="Unique string representing the date")]
+    [string] $DateString = (get-date -f "-yyyy_MM_dd-HH_mm_ss")
 )
 
 $ErrorActionPreference = 'Continue'
@@ -26,10 +29,10 @@ if ($lab -eq $null) {
     exit
 }
 
-$scriptFolder = $PSScriptRoot # Split-Path $Script:MyInvocation.MyCommand.Path
+$scriptFolder = $PSScriptRoot
 
 if(-not $scriptFolder) {
-  Write-Error "Script folder is null"
+  Write-Error "CopyImages: Script folder is null"
   exit
 }
 
@@ -146,4 +149,4 @@ foreach ($sourceImage in $sourceImageInfos) {
     }
 }
 
-$sourceImageInfos | Export-Clixml -Path .\foo.xml # Passed thorugh as subsequent scripts needs info to create VMs, better way?
+$sourceImageInfos | Export-Clixml -Path "Images$DateString.xml" # Passed thorugh as subsequent scripts needs info to create VMs, better way?
