@@ -9,7 +9,12 @@ param
 
 $ErrorActionPreference = 'Continue'
 
-$scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
+$scriptFolder = $PSScriptRoot # Split-Path $Script:MyInvocation.MyCommand.Path
+
+if(-not $scriptFolder) {
+  Write-Error "Script folder is null"
+  exit
+}
 
 # Check we're in the right directory
 if (-not (Test-Path (Join-Path $scriptFolder "NewVM.json"))) {

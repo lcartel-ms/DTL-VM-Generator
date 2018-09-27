@@ -18,7 +18,12 @@ $error.Clear()
 # I am really unconfortable with PS error model ...
 $ErrorActionPreference = 'Continue'
 
-$scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
+$scriptFolder = $PSScriptRoot
+if(-not $scriptFolder) {
+  Write-Error "Script folder is null"
+  exit
+}
+
 $executable = Join-Path $scriptFolder "New-CustomLab.ps1"
 
 # Check we're in the right directory

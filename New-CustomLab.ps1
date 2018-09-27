@@ -40,7 +40,12 @@ Import-Module AzureRM.Profile
 
 $error.Clear()
 
-$scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
+$scriptFolder = $PSScriptRoot
+if(-not $scriptFolder) {
+  Write-Error "Script folder is null"
+  exit
+}
+
 $outputFolder = Join-Path $scriptFolder "logs\"
 
 $outputFile = $DevTestLabName + $DateString + ".txt"
@@ -48,15 +53,18 @@ $outputFilePath = Join-Path $outputFolder $outputFile
 
 #Start-Transcript -Path $outputFilePath -NoClobber -IncludeInvocationHeader
 
-$newLab = Join-Path $scriptFolder "New-DevTestLab.ps1"
-$copyImages = Join-Path $scriptFolder "New-CustomImagesFromStorage.ps1"
-$createVMs = Join-Path $scriptFolder "New-Vms.ps1"
-$setDnsServers = Join-Path $scriptFolder "Set-DnsServers.ps1"
+$newLab             = Join-Path $scriptFolder "New-DevTestLab.ps1"
+$copyImages         = Join-Path $scriptFolder "New-CustomImagesFromStorage.ps1"
+$createVMs          = Join-Path $scriptFolder "New-Vms.ps1"
+$setDnsServers      = Join-Path $scriptFolder "Set-DnsServers.ps1"
+$removeSnapshots    = Join-Path $scriptFolder ".\Remove-SnapshotsForLab.ps1"
 
-& $newLab -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -ShutDownTime $ShutDownTime -TimeZoneId $TimeZoneId -LabRegion $LabRegion -LabOwners $LabOwners -LabUsers $LabUsers
-& $copyImages -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
-& $createVMs -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
-& $setDnsServers -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
+& $newLab           -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -ShutDownTime $ShutDownTime -TimeZoneId $TimeZoneId -LabRegion $LabRegion -LabOwners $LabOwners -LabUsers $LabUsers
+& $copyImages       -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
+& $createVMs        -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
+& $setDnsServers    -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
+& $removeSnapshots  -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
+
 
 if($error.Count -ne 0) {
   Resolve-AzureRmError

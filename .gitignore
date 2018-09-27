@@ -16,3 +16,6 @@ configTest*.csv
 
 #Exclude logs
 logs/*
+
+#Exclude Tests
+Test-*

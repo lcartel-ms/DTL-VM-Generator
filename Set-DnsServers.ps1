@@ -11,8 +11,12 @@ Write-Output "Starting DNS setting ..."
 
 $ErrorActionPreference = 'Continue'
 
-$scriptFolder = Split-Path $Script:MyInvocation.MyCommand.Path
+$scriptFolder = $PSScriptRoot # Split-Path $Script:MyInvocation.MyCommand.Path
 
+if(-not $scriptFolder) {
+  Write-Error "Script folder is null"
+  exit
+}''
 # Check we're in the right directory by checking the existence of the settings file
 if (-not (Test-Path (Join-Path $scriptFolder "foo.xml"))) {
   Write-Error "Unable to find the New-Vm.ps1 template...  unable to proceed."
