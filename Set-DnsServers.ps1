@@ -20,9 +20,9 @@ if(-not $scriptFolder) {
   Write-Error "Script folder is null"
   exit
 }''
-# Check we're in the right directory by checking the existence of the settings file
-if (-not (Test-Path (Join-Path $scriptFolder "foo.xml"))) {
-  Write-Error "Unable to find the New-Vm.ps1 template...  unable to proceed."
+# Check we're in the right directory by checking the existence of this file
+if (-not (Test-Path (Join-Path $scriptFolder "Set-DnsServers.ps1"))) {
+  Write-Error "Unable to find Set-DnsServers.ps1...  unable to proceed. Are you working from the wrong directory?"
   return
 }
 
