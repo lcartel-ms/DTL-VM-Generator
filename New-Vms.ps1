@@ -55,6 +55,15 @@ foreach($descr in $VMDescriptors) {
   $imageName = "/subscriptions/$SubscriptionID/ResourceGroups/$ResourceGroupName/providers/Microsoft.DevTestLab/labs/$DevTestLabName/customImages/$baseImageName"
   $vmName = $descr.imageName
 
+  # If the VM already exists, we delete it.
+  $existingVms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -Name "*$DevTestLabName*" | Where-Object { $_.Name -eq "$DevTestLabName/$vmName"}
+  if($existingVms.Count -ne 0){
+    Write-Output "Deleting VM $vmName"
+    $vmToDelete = $existingVms[0]
+    Remove-AzureRmResource -ResourceId $vmToDelete.ResourceId -Force
+    Start-Sleep -Seconds 10 # Sleep a bit just to be sure deletion is complete
+  }
+
   Write-Output "Starting job to create a VM named $vmName"
 
   $deployName = "Deploy-$DevTestLabName-$vmName"

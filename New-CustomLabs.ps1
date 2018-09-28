@@ -10,7 +10,10 @@ param
     [int] $MinutesToNextLabCreation =  2,
 
     [Parameter(Mandatory=$false, HelpMessage="Creates a transcript of the execution in the logs folder")]
-    [switch] $Transcript
+    [switch] $Transcript,
+
+    [Parameter(HelpMessage="String containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
+    [string] $ImagePattern = ""
 
 )
 
@@ -59,7 +62,7 @@ else {
 
 ForEach ($lab in $config) {
 
-  $argList = "-File ""$executable"" -DateString ""$dateString"" -DevTestLabName $($lab.DevTestLabName) -ResourceGroupName $($lab.ResourceGroupName) -StorageAccountName $($lab.StorageAccountName) -StorageContainerName $($lab.StorageContainerName) -StorageAccountKey ""$($lab.StorageAccountKey)"" -ShutDownTime $($lab.ShutDownTime) -TimeZoneId ""$($lab.TimeZoneId)"" -LabRegion ""$($lab.LabRegion)"" -LabOwners ""$($lab.LabOwners)"" -LabUsers ""$($lab.LabUsers)"" $trString"
+  $argList = "-File ""$executable"" -DateString ""$dateString"" -DevTestLabName $($lab.DevTestLabName) -ResourceGroupName $($lab.ResourceGroupName) -StorageAccountName $($lab.StorageAccountName) -StorageContainerName $($lab.StorageContainerName) -StorageAccountKey ""$($lab.StorageAccountKey)"" -ShutDownTime $($lab.ShutDownTime) -TimeZoneId ""$($lab.TimeZoneId)"" -LabRegion ""$($lab.LabRegion)"" -LabOwners ""$($lab.LabOwners)"" -LabUsers ""$($lab.LabUsers)"" $trString -ImagePattern ""$ImagePattern"" "
 
   Write-Output "$count : Creating lab $($lab.DevTestLabName)"
   $procs += Start-Process "powershell.exe" -PassThru -WindowStyle $WindowsStyle -ArgumentList $argList -WorkingDirectory $scriptFolder

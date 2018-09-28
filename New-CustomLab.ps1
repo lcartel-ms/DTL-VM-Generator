@@ -34,14 +34,13 @@ param
     [string[]] $LabUsers = @(),
 
     [Parameter(Mandatory=$false, HelpMessage="Creates a transcript of the execution in the logs folder")]
-    [switch] $Transcript
+    [switch] $Transcript,
+
+    [Parameter(HelpMessage="String containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
+    [string] $ImagePattern = ""
 )
 
 Import-Module AzureRM.Profile
-
-if($Transcript) {
-  $DebugPreference = "Continue"
-}
 
 $error.Clear()
 
@@ -57,6 +56,7 @@ $outputFile = $DevTestLabName + $DateString + ".txt"
 $outputFilePath = Join-Path $outputFolder $outputFile
 
 if($Transcript) {
+  #$DebugPreference = "Continue"
   Start-Transcript -Path $outputFilePath -NoClobber -IncludeInvocationHeader
 }
 
@@ -66,8 +66,12 @@ $createVMs          = Join-Path $scriptFolder "New-Vms.ps1"
 $setDnsServers      = Join-Path $scriptFolder "Set-DnsServers.ps1"
 $removeSnapshots    = Join-Path $scriptFolder "Remove-SnapshotsForLab.ps1"
 
-& $newLab           -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -ShutDownTime $ShutDownTime -TimeZoneId $TimeZoneId -LabRegion $LabRegion -LabOwners $LabOwners -LabUsers $LabUsers
-& $copyImages       -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey -DateString $DateString
+# Creates a new lab just if no vm pattern was passed ...
+if(-not $ImagePattern) {
+  & $newLab           -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -ShutDownTime $ShutDownTime -TimeZoneId $TimeZoneId -LabRegion $LabRegion -LabOwners $LabOwners -LabUsers $LabUsers
+}
+
+& $copyImages       -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey -DateString $DateString -ImagePattern $ImagePattern
 & $createVMs        -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -DateString $DateString
 & $setDnsServers    -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -DateString $DateString
 & $removeSnapshots  -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName

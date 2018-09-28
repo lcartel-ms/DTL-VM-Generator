@@ -16,7 +16,10 @@
     [string] $StorageAccountKey,
 
     [Parameter(Mandatory=$false, HelpMessage="Unique string representing the date")]
-    [string] $DateString = (get-date -f "-yyyy_MM_dd-HH_mm_ss")
+    [string] $DateString = (get-date -f "-yyyy_MM_dd-HH_mm_ss"),
+
+    [Parameter(HelpMessage="String containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
+    [string] $ImagePattern = ""
 )
 
 $ErrorActionPreference = 'Continue'
@@ -84,6 +87,35 @@ foreach($file in $downloadedFileNames)
     $imageObj.timestamp = [DateTime]::Parse($imageObj.timestamp)
     $sourceImageInfos += $imageObj
 }
+
+# ------------------------------------------------------------------
+# Then we filter the infos according to the vm name patterns
+# ------------------------------------------------------------------
+
+# Just filter if there is an image pattern
+if($ImagePattern) {
+  $imgAr = $ImagePattern.Split(",").Trim()
+
+  # Severely in need of a linq query to do this ...
+  $newSources = @()
+  foreach($source in $sourceImageInfos) {
+    foreach($cond in $imgAr) {
+      if($source.imageName -like $cond) {
+        $newSources += $source
+        break
+      }
+    }
+  }
+
+  if(-not $newSources) {
+    Write-Error "No source images selected by the image pattern chosen"
+    exit
+  }
+
+  $sourceImageInfos = $newSources
+}
+
+Write-Output $sourceImageInfos
 
 # ------------------------------------------------------------------
 # Next we copy each of the images to the DevTest Lab's storage account
