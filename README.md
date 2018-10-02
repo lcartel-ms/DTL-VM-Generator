@@ -10,7 +10,7 @@ The script runs slowlly on my machines (~2.30hr). It is recommended to execute i
 ## The main scripts (in order of logical exectution)
 * [New-CustomRole.ps1](./New-CustomRole.ps1) adds a custom role to the subcription which doesn't have permissions to create new VMs.
 * [New-EmptyLabs.ps1](./New-EmptyLabs.ps1), reads a csv file (exemple [here](demoConfig.csv)) and creates empty DTL Labs ready to be filled with VMs later on.
-* [SetVmFromVhds.ps1](./), this is the main way to fill a lab with VMs. You can pass a series of patterns that match image names to create and specify what to do in case there are already existing VMs in the lab with the same name. It performs:
+* [SetVmFromVhds.ps1](./SetVmFromVhds.ps1), this is the main way to fill a lab with VMs. You can pass a series of patterns that match image names to create and specify what to do in case there are already existing VMs in the lab with the same name. It performs:
   * Gets the json descriptors for the VMs and select the ones matching the patterns
   * Copy VHDs from blob storage to DTL lab storage
   * Creates Custom Images from the VHDs
@@ -21,7 +21,7 @@ The script runs slowlly on my machines (~2.30hr). It is recommended to execute i
 
 
 ## Ancillary scripts
-The repo also contains scripts which might have value on their own to build slightly different solutions. Most of them perform a single operation, instead of a chain of operations (often in parallel). Refer to [the code](./) for full description.
+The repo also contains scripts which might have value on their own to build slightly different solutions. Most of them perform a single operation, instead of a chain of operations (often in parallel). Refer to the code for full description.
 
 
 ## Utility scripts
