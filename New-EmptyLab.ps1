@@ -8,7 +8,7 @@ param
     [Parameter(Mandatory=$true, HelpMessage="The Name of the resource group")]
     [string] $ResourceGroupName,
 
-    $c,$d,$e, # Not used
+    $NotUsed1,$NotUsed2,$NotUsed3,
 
     [ValidateNotNullOrEmpty()]
     [Parameter(HelpMessage="The Region for the DevTest Lab")]
@@ -30,11 +30,12 @@ param
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="Custom Role to add users to")]
-    [string] $CustomRole =  "No VM Creation User"
+    [string] $CustomRole =  "No VM Creation User",
 
+    $NotUsed4,
+    $NotUsed5
 )
 
-$error.Clear()
 $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"

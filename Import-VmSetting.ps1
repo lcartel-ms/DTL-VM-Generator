@@ -1,23 +1,22 @@
 param
 (
+    [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
     [string] $StorageAccountName,
 
+    [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
     [string] $StorageContainerName,
 
+    [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
     [string] $StorageAccountKey
 )
 
-# Clear the errors up front-  helps when running the script multiple times
-$error.Clear()
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = 'Stop'
 
+. "./Utils.ps1"
 
-# ------------------------------------------------------------------
-# Enumerate the JSON files for the images to figure out what to copy
-# ------------------------------------------------------------------
 $SourceStorageContext = New-AzureStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $StorageAccountKey
 $jsonBlobs = Get-AzureStorageBlob -Context $SourceStorageContext -Container $StorageContainerName -Blob '*json'
 Write-Host "Downloading $($jsonBlobs.Count) json files from storage account"
@@ -40,4 +39,4 @@ foreach($file in $downloadedFileNames)
     $sourceImageInfos += $imageObj
 }
 
-$sourceImageInfos | Export-Clixml -Path .\foo.xml # Passed thorugh as subsequent scripts needs info to create VMs, better way?
+$sourceImageInfos
