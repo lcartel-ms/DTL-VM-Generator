@@ -7,5 +7,5 @@ param
   [string] $ResourceGroupName
 )
 
-Write-Output "Removing lab $DtlLabName in $ResourceGroupName"
+Write-Host "Removing lab $DtlLabName in $ResourceGroupName"
 Remove-AzureRmResource -ResourceGroupName $ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs" -ResourceName $DtlLabName -Force

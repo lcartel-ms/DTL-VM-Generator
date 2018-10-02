@@ -69,7 +69,7 @@ foreach ($sourceImage in $VmSettings) {
     New-AzureStorageContainer -Context $DestStorageContext -Name 'uploads' -ErrorAction Ignore
     # Initiate all the file copies
     $copyHandles += Start-AzureStorageBlobCopy -srcUri $srcURI -SrcContext $SourceStorageContext -DestContainer 'uploads' -DestBlob $sourceImage.vhdFileName -DestContext $DestStorageContext -Force
-    Write-Output ("Started copying " + $sourceImage.vhdFileName + " to " + $DestStorageAcctName + " at " + (Get-Date -format "h:mm:ss tt"))
+    Write-Host ("Started copying " + $sourceImage.vhdFileName + " to " + $DestStorageAcctName + " at " + (Get-Date -format "h:mm:ss tt"))
 }
 
 $copyStatus = $copyHandles | Get-AzureStorageBlobCopyState
@@ -77,7 +77,7 @@ $copyStatus = $copyHandles | Get-AzureStorageBlobCopyState
 while (($copyStatus | Where-Object {$_.Status -eq "Pending"}) -ne $null) {
     $copyStatus | Where-Object {$_.Status -eq "Pending"} | ForEach-Object {
         [int]$perComplete = ($_.BytesCopied/$_.TotalBytes)*100
-        Write-Output ("    Copying " + $($_.Source.Segments[$_.Source.Segments.Count - 1]) + " to " + $DestStorageAcctName + " - $perComplete% complete" )
+        Write-Host ("    Copying " + $($_.Source.Segments[$_.Source.Segments.Count - 1]) + " to " + $DestStorageAcctName + " - $perComplete% complete" )
     }
     Start-Sleep -Seconds 60
     $copyStatus = $copyHandles | Get-AzureStorageBlobCopyState
@@ -89,7 +89,7 @@ $copyStatus | Where-Object {$_.Status -ne "Success"} | ForEach-Object {
 }
 
 $copyStatus | Where-Object {$_.Status -eq "Success"} | ForEach-Object {
-    Write-Output "    Completed copying image $($_.Source.Segments[$_.Source.Segments.Count - 1]) to $DestStorageAcctName - 100% complete"
+    Write-Host "    Completed copying image $($_.Source.Segments[$_.Source.Segments.Count - 1]) to $DestStorageAcctName - 100% complete"
 }
 
 # ------------------------------------------------------------------
@@ -115,7 +115,7 @@ foreach ($sourceImage in $VmSettings) {
     Remove-AzureRmResourceGroupDeployment -ResourceGroupName $labRgName -Name $deployName  -ErrorAction SilentlyContinue | Out-Null
 
     if($deployResult.ProvisioningState -eq "Succeeded"){
-        Write-Output "Successfully deployed custom image $($sourceImage.vhdFileName) to Lab $DevTestLabName"
+        Write-Host "Successfully deployed custom image $($sourceImage.vhdFileName) to Lab $DevTestLabName"
     }
     else {
         throw "Image deploy failed for custom image $($sourceImage.vhdFileName) to Lab $DevTestLabName"

@@ -5,5 +5,5 @@ param
 
 )
 $cmd = (Get-History)[-$howLongAgo]
-Write-Output $cmd.CommandLine
+Write-Host $cmd.CommandLine
 $cmd.EndExecutionTime - $cmd.StartExecutionTime

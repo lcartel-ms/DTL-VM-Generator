@@ -42,12 +42,12 @@ ForEach ($lab in $config) {
 
     $argList = "-File ""$executable"" -DateString ""$dateString"" -DevTestLabName $($lab.DevTestLabName) -ResourceGroupName $($lab.ResourceGroupName) -StorageAccountName $($lab.StorageAccountName) -StorageContainerName $($lab.StorageContainerName) -StorageAccountKey ""$($lab.StorageAccountKey)"" -ShutDownTime $($lab.ShutDownTime) -TimeZoneId ""$($lab.TimeZoneId)"" -LabRegion ""$($lab.LabRegion)"" -LabOwners ""$($lab.LabOwners)"" -LabUsers ""$($lab.LabUsers)"""
 
-    Write-Output "Started process to create lab $($lab.DevTestLabName)"
+    Write-Host "Started process to create lab $($lab.DevTestLabName)"
     $procs += Start-Process "powershell.exe" -PassThru -WindowStyle $WindowsStyle -ArgumentList $argList -WorkingDirectory $scriptFolder
   }
 }
 
-Write-Output "Waiting for all processes to end"
+Write-Host "Waiting for all processes to end"
 $procs | Wait-Process -Timeout (60 * 60 * 8)
 
 # Check if there were errors by looking for the presence of error files
@@ -58,7 +58,7 @@ if (Test-Path $errorFolder) {
 }
 
 if($files.Count -eq 0) {
-  Write-Output "All process terminated. No error"
+  Write-Host "All process terminated. No error"
 } else {
   Write-Error "Some errors where found. Opening log files with errors."
   $files | Foreach-Object {

@@ -10,8 +10,8 @@ param
 # HACK: Get-AzureRmResource gives me a wrong error I can't get rid off. You try ...
 $ErrorActionPreference = "SilentlyContinue"
 
-Write-Output "Stopping VMs in $DevTestLabName in RG $ResourceGroupName ..."
-Write-Output "This might take a while ..."
+Write-Host "Stopping VMs in $DevTestLabName in RG $ResourceGroupName ..."
+Write-Host "This might take a while ..."
 
 # Get all VMs in lab expanding properties to get to compute VM
 $vms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName -ExpandProperties -Name "$DevTestLabName/"
@@ -37,7 +37,7 @@ foreach ($vm in $vms) {
     $returnStatus = Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "stop" -Force
 
     if ($returnStatus.Status -eq 'Succeeded') {
-      Write-Output "Successfully stopped DTL machine: $dtlName"
+      Write-Host "Successfully stopped DTL machine: $dtlName"
     }
     else {
       Write-Error "Failed to stop DTL machine: $dtlName"

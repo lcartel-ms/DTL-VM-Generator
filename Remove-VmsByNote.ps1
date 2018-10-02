@@ -28,15 +28,15 @@ $jobs = @()
 
 ForEach ($lab in $config) {
 
-  Write-Output "Starting job to delete Vms from lab $($lab.DevTestLabName)"
+  Write-Host "Starting job to delete Vms from lab $($lab.DevTestLabName)"
   $jobs += Start-Job -Name $lab.DevTestLabName -FilePath $executable -ArgumentList $lab.DevTestLabName, $lab.ResourceGroupName, $NoteText
   Start-Sleep -Seconds $SecondsToNextVmDeletion
 }
 
 $jobCount = $jobs.Count
-Write-Output "Waiting for $jobCount Lab Vms deletion jobs to complete"
+Write-Host "Waiting for $jobCount Lab Vms deletion jobs to complete"
 foreach ($job in $jobs){
     $jobOutput = Receive-Job $job -Wait
-    Write-Output $jobOutput
+    Write-Host $jobOutput
 }
 Remove-Job -Job $jobs

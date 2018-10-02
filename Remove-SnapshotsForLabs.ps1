@@ -23,15 +23,15 @@ $config = Import-Csv $ConfigFile
 $jobs = @()
 
 ForEach ($lab in $config) {
-  Write-Output "Starting job to delete snapshot for lab $($lab.DevTestLabName)"
+  Write-Host "Starting job to delete snapshot for lab $($lab.DevTestLabName)"
   $jobs += Start-Job -Name $lab.DevTestLabName -FilePath $executable -ArgumentList $lab.DevTestLabName, $lab.ResourceGroupName
   Start-Sleep -Seconds 30
 }
 
 $jobCount = $jobs.Count
-Write-Output "Waiting for $jobCount snapshots deletion jobs to complete"
+Write-Host "Waiting for $jobCount snapshots deletion jobs to complete"
 foreach ($job in $jobs){
     $jobOutput = Receive-Job $job -Wait
-    Write-Output $jobOutput
+    Write-Host $jobOutput
 }
 Remove-Job -Job $jobs

@@ -28,14 +28,14 @@ ForEach ($lab in $config) {
         $userAr = $LabUsers
     }
 
-    Write-Output $lab.DevTestLabName
+    Write-Host $lab.DevTestLabName
     foreach ($owneremail in $ownAr) {
-      Write-Output "$owneremail"
+      Write-Host "$owneremail"
       New-AzureRmRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $lab.ResourceGroupName -ResourceName $lab.DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs'
     }
 
     foreach ($useremail in $userAr) {
-      Write-Output "$useremail"
+      Write-Host "$useremail"
       New-AzureRmRoleAssignment -SignInName $useremail -RoleDefinitionName $customRole -ResourceGroupName $lab.ResourceGroupName -ResourceName $lab.DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs'
     }
 

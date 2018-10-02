@@ -34,4 +34,4 @@ foreach ($vm in $vms) {
 }
 
 $runString = $runningVms -join " "
-Write-Output "$DevTestLabName : $runningVms"
+Write-Host "$DevTestLabName : $runningVms"

@@ -25,13 +25,13 @@ ForEach ($lab in $config) {
 }
 
 $jobCount = $jobs.Count
-Write-Output "Waiting for $jobCount threads to retrieve lab infos. Might take some time ..."
-Write-Output ""
-Write-Output "LAB NAME : RUNNING VMS"
-Write-Output "-------------------------------"
+Write-Host "Waiting for $jobCount threads to retrieve lab infos. Might take some time ..."
+Write-Host ""
+Write-Host "LAB NAME : RUNNING VMS"
+Write-Host "-------------------------------"
 foreach ($job in $jobs){
     $jobOutput = Receive-Job $job -Wait
-    Write-Output $jobOutput
+    Write-Host $jobOutput
 }
 Remove-Job -Job $jobs
-Write-Output ""
+Write-Host ""

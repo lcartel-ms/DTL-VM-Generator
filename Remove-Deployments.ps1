@@ -7,18 +7,18 @@ param
   [int] $HowManyDaysBefore = -0
 )
 
-Write-Output "Start removal ..."
+Write-Host "Start removal ..."
 
 $deployments = Get-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName
-Write-Output "Deployments: $($deployments.Count)"
+Write-Host "Deployments: $($deployments.Count)"
 
 $deploymentsToDelete = $deployments | where { $_.Timestamp -lt ((get-date).AddDays($HowManyDaysBefore)) }
 
 foreach ($deployment in $deploymentsToDelete) {
         $deploymentName = $deployment.DeploymentName
-        Write-Output "Removing deployment $deploymentName"
+        Write-Host "Removing deployment $deploymentName"
         Remove-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -DeploymentName $deploymentName
 }
 
-Write-Output "All done!"
+Write-Host "All done!"
 

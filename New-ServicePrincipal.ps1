@@ -25,16 +25,16 @@ $ServicePrincipalPassword = ConvertTo-SecureString -String $ServicePrincipalPass
 # Create the service principal!
 $ServicePrincipal = New-AzureRMADServicePrincipal -DisplayName $ApplicationDisplayName -Password $ServicePrincipalPassword
 
-Write-Output "--------------------------------------------------"
-Write-Output "Service Principle Information"
-Write-Output "Connection Name: $ApplicationDisplayName"
-Write-Output "Subscription Id: $($sub.Id)"
-Write-Output "Subscription Name: $($sub.Name)"
-Write-Output "Service Principle Client Id: $($ServicePrincipal.ApplicationId)"
-Write-Output "Service Principle Key: $ServicePrincipalPasswordPlainText"
-Write-Output "Tenant Id: $($sub.TenantId)"
-Write-Output "Object Id: $($ServicePrincipal.Id)"
-Write-Output "--------------------------------------------------"
+Write-Host "--------------------------------------------------"
+Write-Host "Service Principle Information"
+Write-Host "Connection Name: $ApplicationDisplayName"
+Write-Host "Subscription Id: $($sub.Id)"
+Write-Host "Subscription Name: $($sub.Name)"
+Write-Host "Service Principle Client Id: $($ServicePrincipal.ApplicationId)"
+Write-Host "Service Principle Key: $ServicePrincipalPasswordPlainText"
+Write-Host "Tenant Id: $($sub.TenantId)"
+Write-Host "Object Id: $($ServicePrincipal.Id)"
+Write-Host "--------------------------------------------------"
 
 Start-Sleep -Seconds 30
 
