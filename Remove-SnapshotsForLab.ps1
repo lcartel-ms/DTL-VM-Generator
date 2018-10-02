@@ -7,7 +7,7 @@ param
   [string] $ResourceGroupName
 )
 
-Write-Output "Removing snapshots for lab $DevTestLabName in $ResourceGroupName"
+Write-Host "Removing snapshots for lab $DevTestLabName in $ResourceGroupName"
 
 $snapshots = Get-AzureRmResource -ResourceType 'Microsoft.DevTestLab/labs/customImages' -ResourceName $DevTestLabName -ResourceGroupName $ResourceGroupName -ApiVersion '2016-05-15'
 
@@ -23,9 +23,8 @@ $snapshots | ForEach-Object {
 }
 
 $jobCount = $jobs.Count
-Write-Output "Waiting for $jobCount snapshots deletion jobs to complete for $DevTestLabName"
+Write-Host "Waiting for $jobCount snapshots deletion jobs to complete for $DevTestLabName"
 foreach ($job in $jobs){
     $jobOutput = Receive-Job $job -Wait
-    Write-Output $jobOutput
 }
 Remove-Job -Job $jobs

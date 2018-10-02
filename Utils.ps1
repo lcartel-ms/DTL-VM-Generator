@@ -28,6 +28,51 @@ function Set-LabAccessControl {
     Write-Host "$useremail added as $customRole"
   }
 }
+
+function Show-JobProgress {
+  [CmdletBinding()]
+  param(
+      [Parameter(Mandatory,ValueFromPipeline)]
+      [ValidateNotNullOrEmpty()]
+      [System.Management.Automation.Job[]]
+      $Job
+      ,
+      [Parameter()]
+      [ValidateNotNullOrEmpty()]
+      [scriptblock]
+      $FilterScript
+  )
+
+  Process {
+      $Job.ChildJobs | ForEach-Object {
+          if (-not $_.Progress) {
+              return
+          }
+
+          $LastProgress = $_.Progress
+          if ($FilterScript) {
+              $LastProgress = $LastProgress | Where-Object -FilterScript $FilterScript
+          }
+
+          $LastProgress | Group-Object -Property Activity,StatusDescription | ForEach-Object {
+              $_.Group | Select-Object -Last 1
+
+          } | ForEach-Object {
+              $ProgressParams = @{}
+              if ($_.Activity          -and $_.Activity          -ne $null) { $ProgressParams.Add('Activity',         $_.Activity) }
+              if ($_.StatusDescription -and $_.StatusDescription -ne $null) { $ProgressParams.Add('Status',           $_.StatusDescription) }
+              if ($_.CurrentOperation  -and $_.CurrentOperation  -ne $null) { $ProgressParams.Add('CurrentOperation', $_.CurrentOperation) }
+              if ($_.ActivityId        -and $_.ActivityId        -gt -1)    { $ProgressParams.Add('Id',               $_.ActivityId) }
+              if ($_.ParentActivityId  -and $_.ParentActivityId  -gt -1)    { $ProgressParams.Add('ParentId',         $_.ParentActivityId) }
+              if ($_.PercentComplete   -and $_.PercentComplete   -gt -1)    { $ProgressParams.Add('PercentComplete',  $_.PercentComplete) }
+              if ($_.SecondsRemaining  -and $_.SecondsRemaining  -gt -1)    { $ProgressParams.Add('SecondsRemaining', $_.SecondsRemaining) }
+
+              Write-Progress @ProgressParams
+          }
+      }
+  }
+}
+
 function Invoke-ForEachLab {
   param
   (
@@ -67,6 +112,16 @@ function Invoke-ForEachLab {
   }
 
   Write-Host "Waiting for results at most 5 hours..."
+
+  $runningJobs = $jobs | Where-Object { $_.state -eq "Running" }
+  while($runningJobs) {
+    $jobs | Where-Object {
+      $_ | Wait-Job -Timeout 4
+      $_ | Show-JobProgress
+    }
+    $runningJobs = $jobs | Where-Object { $_.state -eq "Running" }
+  }
+
   $jobs | Wait-Job -Timeout (5 * 60 * 60) | ForEach-Object {
     if($_.State -eq 'Failed') {
       Write-Host "$($_.Name) Failed!" -ForegroundColor Red -BackgroundColor Black
@@ -102,8 +157,7 @@ function Select-VmSettings {
     }
 
     if(-not $newSources) {
-      Write-Error "No source images selected by the image pattern chosen"
-      exit
+      throw "No source images selected by the image pattern chosen"
     }
 
     return $newSources
@@ -126,7 +180,7 @@ function ManageExistingVM {
       if($IfExist -eq "Delete") {
         Write-Host "Deleting VM $vmName"
         $vmToDelete = $existingVms[0]
-        Remove-AzureRmResource -ResourceId $vmToDelete.ResourceId -Force
+        Remove-AzureRmResource -ResourceId $vmToDelete.ResourceId -Force | Out-Null
         $newSettings += $_
       } elseif ($IfExist -eq "Leave") {
         Write-Host "Leaving VM $vmName be, not moving forward ..."
@@ -135,7 +189,10 @@ function ManageExistingVM {
       } else {
         throw "Shouldn't get here in New-Vm. Parameter passed is $IfExist"
       }
+    } else { # It is not an existing VM, we should continue creating it
+      Write-Host "$vmName doesn't exist in $DevTestLabName"
+      $newSettings += $_
     }
   }
-  $newSettings
+  return $newSettings
 }
