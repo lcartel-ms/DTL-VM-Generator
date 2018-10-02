@@ -1,21 +1,28 @@
 # Create DevTest Labs from a storage of custom images
-The main script takes as input a csv file for creating multiple DevTest Labs from an Azure Blob storage containing VHDs and json descriptors. The script creates the labs, add the VHDs as custom images and creates one claimable VM for each custom image.
+The main script takes as input a csv file for creating multiple DevTest Labs from an Azure Blob storage containing VHDs and [json descriptors](./ImagesDescr). The script creates the labs, add the VHDs as custom images and creates one claimable VM for each custom image.
 
 Additionally you can set owners and users for such labs together with additional data like shutdown time, region and such. The users added to the lab have no permissions to create new VMs, so that the content of the lab is fixed.
 
-The script creates the labs in paralllel with a new powershell process for each lab in a minimized window for easy tracking. It also automatically generates log files errors and opens them up at the end of execution. 
+The script creates the labs in paralllel with a new powershell job.
 
 The script runs slowlly on my machines (~2.30hr). It is recommended to execute it from inside an Azure VM to minimize network delays. If the DevTest Labs team implements creating custom images from a storage location without copying them to the lab storage account first, then the script can be made substantially faster.
 
-The script is [New-CustomLabs.ps1](./New-CustomLabs.ps1), a demo csv file is [here](demoConfig.csv) and sample descriptors are [here](./ImagesDescr).
+## The main scripts (in order of logical exectution)
+* [New-CustomRole.ps1](./New-CustomRole.ps1) adds a custom role to the subcription which doesn't have permissions to create new VMs.
+* [New-EmptyLabs.ps1](./New-EmptyLabs.ps1), reads a csv file (exemple [here](demoConfig.csv)) and creates empty DTL Labs ready to be filled with VMs later on.
+* [SetVmFromVhds.ps1](./), this is the main way to fill a lab with VMs. You can pass a series of patterns that match image names to create and specify what to do in case there are already existing VMs in the lab with the same name. It performs:
+  * Gets the json descriptors for the VMs and select the ones matching the patterns
+  * Copy VHDs from blob storage to DTL lab storage
+  * Creates Custom Images from the VHDs
+  * Creates one VM for each custom image
+  * Creates the network topology described in the json descriptors
+  * Deletes the custom images from the lab
+* [RemoveVmsInLab.ps1](./RemoveVmsInLab.ps1), removes all VMs in each lab matching certain patterns in the Notes field (shouldn't it be name?)
+
 
 ## Ancillary scripts
-The repo also contains scripts which might have value on their own to build slightly different solutions and are, therefore, lightly documented below. Refer to the code for full description of arguments.
+The repo also contains scripts which might have value on their own to build slightly different solutions. Most of them perform a single operation, instead of a chain of operations (often in parallel). Refer to [the code](./) for full description.
 
-* [New-CustomLab.ps1](./New-CustomLab.ps1) creates a lab as above given arguments as in one line of the above csv file
-* [New-DevTestLab.ps1](./New-DevTestLab.ps1) creates a generic DevTest Lab given most common parameters
-* [New-CustomImagesFromStorage.ps1](./New-CustomImagesFromStorage.ps1) creates a set of custom images in a lab given a link to a blob storage containing vhds and descriptor json files. As side effects it creates a foo.xml file used in the next step of the process.
-* [New-Vms.ps1](./New-Vms.ps1) Creates the vms described in a foo.xml file in parallel.
 
 ## Utility scripts
 * [Login-AzSub.ps1](./Login-AzSub.ps1) log into Azure with a specific subId.
