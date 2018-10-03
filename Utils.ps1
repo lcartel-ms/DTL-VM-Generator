@@ -16,7 +16,6 @@ function Set-LabAccessControl {
     [string[]] $ownAr,
     [string[]] $userAr
   )
-  Write-Host "Setting access control in lab $DevTestLabName in RG $ResourceGroupName for custom role $customRole to $userAr and owners to $ownAr"
 
   foreach ($owneremail in $ownAr) {
     New-AzureRmRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
@@ -97,16 +96,16 @@ function Invoke-ForEachLab {
     if($lab.LabOwners) {
         $ownAr = $lab.LabOwners.Split(",").Trim()
     } else {
-        $ownAr = @($lab.LabOwners)
+        $ownAr = @()
     }
     if($lab.LabUsers) {
         $userAr = $lab.LabUsers.Split(",").Trim()
     } else {
-        $userAr = @($lab.LabUsers)
+        $userAr = @()
     }
 
     # It is necessary to go through a string to 'embed' the path there, otherwise the init script gets evaluated in a different scope. Couldn't get $using to work, which would be more correct.
-    $initScript = [scriptblock]::create("Set-Location $PSScriptRoot")
+    $initScript = [scriptblock]::create("Set-Location ""$PWD""")
     $jobs += Start-Job -Name $lab.DevTestLabName -InitializationScript $initScript -FilePath $script -ArgumentList $lab.DevTestLabName, $lab.ResourceGroupName, $lab.StorageAccountName, $lab.StorageContainerName, $lab.StorageAccountKey, $lab.ShutDownTime, $lab.TimezoneId, $lab.LabRegion, $ownAr, $userAr, $customRole, $ImagePattern, $IfExist
     Start-Sleep -Seconds $SecondsBetweenLoop
   }
@@ -115,7 +114,7 @@ function Invoke-ForEachLab {
 
   $runningJobs = $jobs | Where-Object { $_.state -eq "Running" }
   while($runningJobs) {
-    $jobs | Where-Object {
+    $jobs | ForEach-Object {
       $_ | Wait-Job -Timeout 4
       $_ | Show-JobProgress
     }

@@ -20,12 +20,12 @@ ForEach ($lab in $config) {
     if($LabOwners) {
         $ownAr = $LabOwners.Split(",").Trim()
     } else {
-        $ownAr = $LabOwners
+        $ownAr = @()
     }
     if($LabUsers) {
         $userAr = $LabUsers.Split(",").Trim()
     } else {
-        $userAr = $LabUsers
+        $userAr = @()
     }
 
     Write-Host $lab.DevTestLabName
