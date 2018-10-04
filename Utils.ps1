@@ -91,7 +91,7 @@ function Wait-JobWithProgress {
   $runningJobs = $jobs | Where-Object { $_.State -eq "Running" }
   while(($runningJobs) -and ($timer.Elapsed.TotalSeconds -lt $secTimeout)) {
 
-    $runningJobs | Receive-job -Keep                                      # Show partial results
+    $runningJobs | Receive-job -Keep -ErrorAction Continue                # Show partial results
     $runningJobs | Wait-Job -Timeout $RetryIntervalSec | Show-JobProgress # Show progress bar
 
     $totalSecs = [math]::Round($timer.Elapsed.TotalSeconds,0)
