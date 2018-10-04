@@ -5,14 +5,16 @@ param
   [string] $DevTestLabName,
 
   [Parameter(Mandatory=$true, HelpMessage="RG of lab to query")]
-  [string] $ResourceGroupName
+  [string] $ResourceGroupName,
+
+  [Parameter(valueFromRemainingArguments=$true)]
+  [String[]]
+  $rest = @()
 )
 
-# HACK: Get-AzureRmResource gives me a wrong error I can't get rid off. You try ...
-$ErrorActionPreference = "SilentlyContinue"
+$ErrorActionPreference = "Stop"
 
-# Get all VMs in lab expanding properties to get to compute VM
-$vms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName -ExpandProperties -Name "$DevTestLabName/"
+$existingVms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -Name "*$DevTestLabName*" | Where-Object { $_.Name -like "$DevTestLabName/*"}
 $runningVms = @()
 
 foreach ($vm in $vms) {
@@ -32,6 +34,9 @@ foreach ($vm in $vms) {
     $runningVms += $vm.Name
   }
 }
-
-$runString = $runningVms -join " "
-Write-Host "$DevTestLabName : $runningVms"
+if($runningVms) {
+  $runString = $runningVms -join " "
+} else {
+  $runString = 'None'
+}
+Write-Host "RUNNING VMS FOR LAB $DevTestLabName : $runString"
