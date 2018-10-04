@@ -20,14 +20,16 @@ param
     [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
     [string] $StorageAccountKey,
 
-    $NotUsed1,$NotUsed2,$NotUsed3,$NotUsed4,$NotUsed5,$NotUsed6,
-
     [Parameter(HelpMessage="String containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
     [string] $ImagePattern = "",
 
     [ValidateSet("Delete","Leave","Error")]
     [Parameter(Mandatory=$true, HelpMessage="What to do if a VM with the same name exist in the lab (Delete, Leave, Error)")]
-    [string] $IfExist
+    [string] $IfExist,
+
+    [Parameter(valueFromRemainingArguments=$true)]
+    [String[]]
+    $rest = @()
 )
 
 $ErrorActionPreference = "Stop"

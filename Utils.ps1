@@ -114,7 +114,7 @@ function Wait-JobWithProgress {
   if ($timer.Elapsed.TotalSeconds -gt $secTimeout) {
     throw 'Jobs did not complete before timeout period.'
   } else {
-    Write-Host -Message 'Jobs completed before timeout period'
+    Write-Host 'Jobs completed before timeout period'
   }
 }
 
@@ -150,9 +150,41 @@ function Invoke-ForEachLab {
         $userAr = @()
     }
 
-    # It is necessary to go through a string to 'embed' the path there, otherwise the init script gets evaluated in a different scope. Couldn't get $using to work, which would be more correct.
+    # The scripts that operate over a single lab need to have an uniform number of parameters so that they can be invoked by Invoke-ForeachLab.
+    # The argumentList of star-job just allows passing arguments positionally, so it can't be used if the scripts have arguments in different positions.
+    # To workaround that, a string gets generated that embed the script as text and passes the parameters by name instead
+    # Also, a valueFromRemainingArguments=$true parameter needs to be added to the single lab script
+    # So we achieve the goal of reusing the Invoke-Foreach function for everything, while still keeping the single lab scripts clean for the caller
+    # The price we pay for the above is the crazy code below, which is likely quite bug prone ...
+    $formatOwners = $ownAr | ForEach-Object { "'$_'"}
+    $ownStr = $formatOwners -join ","
+    $formatUsers = $userAr | ForEach-Object { "'$_'"}
+    $userStr = $formatUsers -join ","
+
     $initScript = [scriptblock]::create("Set-Location ""$PWD""")
-    $jobs += Start-Job -Name $lab.DevTestLabName -InitializationScript $initScript -FilePath $script -ArgumentList $lab.DevTestLabName, $lab.ResourceGroupName, $lab.StorageAccountName, $lab.StorageContainerName, $lab.StorageAccountKey, $lab.ShutDownTime, $lab.TimezoneId, $lab.LabRegion, $ownAr, $userAr, $customRole, $ImagePattern, $IfExist
+    $params = "@{
+      DevTestLabName='$($lab.DevTestLabName)';
+      ResourceGroupName='$($lab.ResourceGroupName)';
+      StorageAccountName='$($lab.StorageAccountName)';
+      StorageContainerName='$($lab.StorageContainerName)';
+      StorageAccountKey='$($lab.StorageAccountKey)';
+      ShutDownTime='$($lab.ShutDownTime)';
+      TimezoneId='$($lab.TimezoneId)';
+      LabRegion='$($lab.LabRegion)';
+      LabOwners= @($ownStr);
+      LabUsers= @($userStr);
+      CustomRole='$($customRole)';
+      ImagePattern='$($ImagePattern)';
+      IfExist='$($IfExist)'
+    }"
+
+    $sb = [scriptblock]::create(
+    @"
+    `$params=$params
+    .{$(get-content $script -Raw)} @params
+"@)
+
+    $jobs += Start-Job -Name $lab.DevTestLabName -InitializationScript $initScript -ScriptBlock $sb
     Start-Sleep -Seconds $SecondsBetweenLoop
   }
 

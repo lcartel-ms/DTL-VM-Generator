@@ -8,8 +8,6 @@ param
     [Parameter(Mandatory=$true, HelpMessage="The Name of the resource group")]
     [string] $ResourceGroupName,
 
-    $NotUsed1,$NotUsed2,$NotUsed3,
-
     [ValidateNotNullOrEmpty()]
     [Parameter(HelpMessage="The Region for the DevTest Lab")]
     [string] $ShutDownTime = "1900",
@@ -32,8 +30,9 @@ param
     [Parameter(Mandatory=$false, HelpMessage="Custom Role to add users to")]
     [string] $CustomRole =  "No VM Creation User",
 
-    $NotUsed4,
-    $NotUsed5
+    [Parameter(valueFromRemainingArguments=$true)]
+    [String[]]
+    $rest = @()
 )
 
 $ErrorActionPreference = "Stop"
