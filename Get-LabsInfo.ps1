@@ -10,5 +10,5 @@ $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"
 
-"./Get-LabInfo.ps1" | Invoke-ForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop 2
+"./Get-LabInfo.ps1" | Invoke-ForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop 2 -SecTimeout (30 * 60)
 
