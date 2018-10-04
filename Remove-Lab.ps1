@@ -1,11 +1,17 @@
 param
 (
   [Parameter(Mandatory=$true, HelpMessage="Name of lab to remove")]
-  [string] $DtlLabName,
+  [string] $DevTestLabName,
 
   [Parameter(Mandatory=$true, HelpMessage="RG of lab to remove")]
-  [string] $ResourceGroupName
+  [string] $ResourceGroupName,
+
+  [Parameter(valueFromRemainingArguments=$true)]
+  [String[]]
+  $rest = @()
 )
 
-Write-Host "Removing lab $DtlLabName in $ResourceGroupName"
-Remove-AzureRmResource -ResourceGroupName $ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs" -ResourceName $DtlLabName -Force
+$ErrorActionPreference = "Stop"
+
+Write-Host "Removing lab $DevTestLabName in $ResourceGroupName"
+Remove-AzureRmResource -ResourceGroupName $ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs" -ResourceName $DevTestLabName -Force
