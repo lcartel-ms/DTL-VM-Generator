@@ -72,6 +72,52 @@ function Show-JobProgress {
   }
 }
 
+function Wait-JobWithProgress {
+  param(
+    [Parameter(Mandatory,ValueFromPipeline)]
+    [ValidateNotNullOrEmpty()]
+    $jobs,
+
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    $secTimeout
+    )
+
+  Write-Host "Waiting for results at most $secTimeout seconds, or $( [math]::Round($secTimeout / 60,1)) minutes, or $( [math]::Round($secTimeout / 60 / 60,1)) hours ..."
+
+  $RetryIntervalSec = 5
+  $timer = [Diagnostics.Stopwatch]::StartNew()
+
+  $runningJobs = $jobs | Where-Object { $_.State -eq "Running" }
+  while(($runningJobs) -and ($timer.Elapsed.TotalSeconds -lt $secTimeout)) {
+
+    $runningJobs | Receive-job -Keep                                      # Show partial results
+    $runningJobs | Wait-Job -Timeout $RetryIntervalSec | Show-JobProgress # Show progress bar
+
+    $totalSecs = [math]::Round($timer.Elapsed.TotalSeconds,0)
+    Write-Host "Passed: $totalSecs seconds, or $( [math]::Round($totalSecs / 60,1)) minutes, or $( [math]::Round($totalSecs / 60 / 60,1)) hours ..." -ForegroundColor Yellow
+
+    $runningJobs = $jobs | Where-Object { $_.State -eq "Running" }
+  }
+  $timer.Stop()
+  Write-Host ""
+  Write-Host "JOBS STATUS"
+  Write-Host "-------------------"
+  $jobs                                           # Show overall status of all jobs
+  Write-Host ""
+  Write-Host "JOBS OUTPUT"
+  Write-Host "-------------------"
+  $jobs | Receive-Job -ErrorAction Continue       # Show output for all jobs
+
+  $jobs | Remove-job -Force                       # -Force removes also the ones still running ...
+
+  if ($timer.Elapsed.TotalSeconds -gt $secTimeout) {
+    throw 'Jobs did not complete before timeout period.'
+  } else {
+    Write-Host -Message 'Jobs completed before timeout period'
+  }
+}
+
 function Invoke-ForEachLab {
   param
   (
@@ -110,27 +156,7 @@ function Invoke-ForEachLab {
     Start-Sleep -Seconds $SecondsBetweenLoop
   }
 
-  Write-Host "Waiting for results at most 5 hours..."
-
-  $runningJobs = $jobs | Where-Object { $_.state -eq "Running" }
-  while($runningJobs) {
-    $jobs | ForEach-Object {
-      $_ | Wait-Job -Timeout 4
-      $_ | Show-JobProgress
-    }
-    $runningJobs = $jobs | Where-Object { $_.state -eq "Running" }
-  }
-
-  $jobs | Wait-Job -Timeout (5 * 60 * 60) | ForEach-Object {
-    if($_.State -eq 'Failed') {
-      Write-Host "$($_.Name) Failed!" -ForegroundColor Red -BackgroundColor Black
-      # TODO: need to find a way to get correct stack trace
-    } else {
-      Write-Host "$($_.Name) Succeded!"
-    }
-    $_ | Receive-Job -ErrorAction Continue
-  }
-  $jobs | Remove-Job
+  $jobs | Wait-JobWithProgress -secTimeout (5 * 60 * 60)
 }
 
 function Select-VmSettings {
