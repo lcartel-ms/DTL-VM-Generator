@@ -74,7 +74,6 @@ function Show-JobProgress {
 
 function Wait-JobWithProgress {
   param(
-    [Parameter(Mandatory,ValueFromPipeline)]
     [ValidateNotNullOrEmpty()]
     $jobs,
 
@@ -127,7 +126,7 @@ function Invoke-ForEachLab {
     [int] $SecondsBetweenLoops =  10,
     [string] $customRole = "No VM Creation User",
     [string] $ImagePattern = "",
-    [string] $IfExist
+    [string] $IfExist = "Leave"
   )
 
   $config = Import-Csv $ConfigFile
@@ -188,7 +187,7 @@ function Invoke-ForEachLab {
     Start-Sleep -Seconds $SecondsBetweenLoops
   }
 
-  $jobs | Wait-JobWithProgress -secTimeout (5 * 60 * 60)
+  Wait-JobWithProgress -secTimeout (5 * 60 * 60) -jobs $jobs
 }
 
 function Select-VmSettings {
