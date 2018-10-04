@@ -185,7 +185,7 @@ function Invoke-ForEachLab {
 "@)
 
     $jobs += Start-Job -Name $lab.DevTestLabName -InitializationScript $initScript -ScriptBlock $sb
-    Start-Sleep -Seconds $SecondsBetweenLoop
+    Start-Sleep -Seconds $SecondsBetweenLoops
   }
 
   $jobs | Wait-JobWithProgress -secTimeout (5 * 60 * 60)
