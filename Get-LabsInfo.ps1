@@ -2,7 +2,7 @@ param
 (
     [Parameter(Mandatory=$false, HelpMessage="Configuration File, see example in directory")]
     [ValidateNotNullOrEmpty()]
-    [string] $ConfigFile = "configTest.csv"
+    [string] $ConfigFile = "config.csv"
 )
 
 $error.Clear()
