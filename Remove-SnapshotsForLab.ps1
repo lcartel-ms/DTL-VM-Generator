@@ -20,14 +20,18 @@ Write-Host "Removing snapshots for lab $DevTestLabName in $ResourceGroupName"
 $snapshots = Get-AzureRmResource -ResourceType 'Microsoft.DevTestLab/labs/customImages' -ResourceName $DevTestLabName -ResourceGroupName $ResourceGroupName -ApiVersion '2016-05-15'
 
 if(-not $snapshots) {
-  Write-Host "No snapshots to remove in $DevTestLabName"
-  exit
+  return "No snapshots to remove in $DevTestLabName"
 }
 
 $jobs = @()
 
 $snapshots | ForEach-Object {
-  $jobs += Remove-AzureRmResource -AsJob -ResourceId $_.ResourceId -Force -ApiVersion '2016-05-15'
+  $sb = {
+    Remove-AzureRmResource -ResourceId ($Using:_).ResourceId -Force -ApiVersion '2016-05-15'
+  }
+  $jobs += Start-RSJob -ScriptBlock $sb -Name $deployName
 }
 
-Wait-JobWithProgress -secTimeout (1 * 60 * 60) -jobs $jobs
+Wait-RSJobWithProgress -secTimeout (1 * 60 * 60) -jobs $jobs
+
+Write-Output "Snapshot deleted for $DevTestLabName"

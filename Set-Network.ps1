@@ -28,7 +28,6 @@ Write-Host "Starting DNS setting ..."
 
 if(-not $scriptFolder) {
   throw "Script folder is null"
-  exit
 }
 
 # Get all VMs in lab expanding properties to get to compute VM
@@ -60,7 +59,7 @@ $VmSettings | ForEach-Object {
   $ip = $nic.IpConfigurations | ForEach-Object {$_.PrivateIpAddress}
 
   $nicsHash.add($vmName, @{'nic' = $nic; 'dnsServer' = $dnsServer;'ip' = $ip})
-}
+} | Out-Null
 
 if($nicsHash.count -eq 0) {
   throw "Found no NICS??"
@@ -86,4 +85,6 @@ $nicsHash.Keys | ForEach-Object {
     $nic | Set-AzureRmNetworkInterface | Out-Null
     Write-Host "$_`t-> $dnsName`t$dnsIp"
   }
-}
+} | Out-Null
+
+Write-Output "Network setted correctly for $DevTestLabName"

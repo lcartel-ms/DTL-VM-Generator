@@ -17,5 +17,5 @@ $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"
 
-"./New-EmptyLab.ps1" | Invoke-ForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -CustomRole $CustomRole
+"./New-EmptyLab.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -CustomRole $CustomRole
 

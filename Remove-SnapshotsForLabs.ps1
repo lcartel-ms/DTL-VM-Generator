@@ -9,4 +9,4 @@ $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"
 
-"./Remove-SnapshotsForLab.ps1" | Invoke-ForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop 2
+"./Remove-SnapshotsForLab.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop 2

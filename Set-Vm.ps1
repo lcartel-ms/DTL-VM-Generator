@@ -56,21 +56,15 @@ foreach($descr in $VmSettings) {
   Write-Host "Starting job to create a VM named $vmName"
 
   $deployName = "Deploy-$DevTestLabName-$vmName"
-  $jobs += New-AzureRmResourceGroupDeployment -AsJob -Name $deployName -ResourceGroupName $ResourceGroupName -TemplateFile $templatePath -labName $DevTestLabName -newVMName $vmName -size $descr.size -storageType $descr.storageType -customImage $imageName -notes $descr.description
 
+  $sb = {
+    New-AzureRmResourceGroupDeployment -Name $Using:deployName -ResourceGroupName $Using:ResourceGroupName -TemplateFile $Using:templatePath -labName $Using:DevTestLabName -newVMName $Using:vmName -size ($Using:descr).size -storageType ($Using:descr).storageType -customImage $Using:imageName -notes ($Using:descr).description | Out-Null
+  }
+
+  $jobs += Start-RSJob -ScriptBlock $sb -Name $deployName
   Start-Sleep -Seconds 60
 }
 
-Write-Host "Waiting for results at most 5 hours..."
-$jobs | Wait-Job -Timeout (5 * 60 * 60) | ForEach-Object {
-  if($_.State -eq 'Failed') {
-    Write-Host "$($_.Name) Failed!" -ForegroundColor Red -BackgroundColor Black
-    # TODO: need to find a way to get correct stack trace
-  } else {
-    Write-Host "$($_.Name) Succeded!"
-  }
-  $_ | Receive-Job -ErrorAction Continue
-}
-$jobs | Remove-Job
+Wait-RSJobWithProgress -secTimeout (5*60*60) -jobs $jobs
 
-$VmSettings
+Write-Output "VMs created succesfully in $DevTestLabName"

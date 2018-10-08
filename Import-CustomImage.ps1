@@ -85,7 +85,7 @@ while (($copyStatus | Where-Object {$_.Status -eq "Pending"}) -ne $null) {
 
 # Copies are complete by this point, but we need to check for errors
 $copyStatus | Where-Object {$_.Status -ne "Success"} | ForEach-Object {
-    Write-Error "    Error copying image $($_.Source.Segments[$_.Source.Segments.Count - 1]), $($_.StatusDescription)"
+    throw "    Error copying image $($_.Source.Segments[$_.Source.Segments.Count - 1]), $($_.StatusDescription)"
 }
 
 $copyStatus | Where-Object {$_.Status -eq "Success"} | ForEach-Object {
@@ -109,7 +109,7 @@ foreach ($sourceImage in $VmSettings) {
     $deployResult = New-AzureRmResourceGroupDeployment -Name $deployName -ResourceGroupName $labRgName -TemplateFile $templatePath -existingLabName $DevTestLabName -existingVhdUri $vhdUri -imageOsType $sourceImage.osType -imageName $uniqueImageName -imageDescription $sourceImage.description
 
     # Delete the VHD, we don't need it after the custom image is created, since it uses managed images
-    Remove-AzureStorageBlob -Context $DestStorageContext -Container 'uploads' -Blob $sourceImage.vhdFileName
+    Remove-AzureStorageBlob -Context $DestStorageContext -Container 'uploads' -Blob $sourceImage.vhdFileName | Out-Null
 
     # Remove Deployment
     Remove-AzureRmResourceGroupDeployment -ResourceGroupName $labRgName -Name $deployName  -ErrorAction SilentlyContinue | Out-Null
@@ -122,4 +122,4 @@ foreach ($sourceImage in $VmSettings) {
     }
 }
 
-$VmSettings
+Write-Output "Copied all images to $DevTestLabName"

@@ -66,7 +66,7 @@ else {
       New-AzureRmResourceGroup -Name $ResourceGroupName -Location $LabRegion | Out-Null
     }
 
-    Write-Host "Starting deployment of lab ..."
+    Write-Host "Starting deployment of lab $DevTestLabName ..."
     New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile (Join-Path $pwd.Path "New-DevTestLab.json") -devTestLabName $DevTestLabName -region $LabRegion -shutdowntime $ShutDownTime -timezoneid $TimeZoneId | out-null
 
     # You can easily run out of deployments. The drawback is that it doesn't remember failures, but doesn't seem to be needed to access logs.
@@ -75,6 +75,6 @@ else {
 
     Set-LabAccessControl $DevTestLabName $ResourceGroupName $CustomRole $LabOwners $LabUsers
 
-    Write-Host "Completed Creating the '$DevTestLabName' lab"
+    Write-Output "Completed Creating the '$DevTestLabName' lab"
 }
 

@@ -52,8 +52,7 @@ Write-Host "Settings selected ... $selected"
 $toCreate = ManageExistingVM $DevTestLabName $selected $IfExist
 
 if(-not $toCreate) {
-  Write-Host "No Vms to create for $DevTestLabName with the pattern $ImagePattern and IfExist as $IfExist"
-  return $toCreate
+  return "No Vms to create for $DevTestLabName with the pattern $ImagePattern and IfExist as $IfExist"
 }
 
 Write-Host "Creating ... $toCreate"
@@ -63,4 +62,4 @@ Write-Host "Creating ... $toCreate"
 & "./Remove-SnapshotsForLab.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
 & "./Set-Network.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VmSettings $toCreate
 
-$toCreate
+return "Creation seemed to have worked fine for $DevTestLabName"
