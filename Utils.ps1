@@ -43,6 +43,12 @@ function Show-JobProgress {
   )
 
   Process {
+      # if you have 'strict' mode on, you can't check for the existence of a property
+      # by using the dot notation, because it triggers a 'property don't exist exception'
+      if(-not ("ChildJobs" -in $job.PSobject.Properties.Name)) {
+        Write-Host "No Childjobs for this job ..."
+        return
+      }
       $Job.ChildJobs | ForEach-Object {
           if (-not $_.Progress) {
               return
@@ -84,20 +90,36 @@ function Wait-JobWithProgress {
 
   Write-Host "Waiting for results at most $secTimeout seconds, or $( [math]::Round($secTimeout / 60,1)) minutes, or $( [math]::Round($secTimeout / 60 / 60,1)) hours ..."
 
-  $RetryIntervalSec = 5
+  if(-not $jobs) {
+    Write-Host "No jobs to wait for"
+    return
+  }
+
+  # Control how often we show output and print out time passed info
+  # Change here to make it go faster or slower
+  $RetryIntervalSec = 7
+  $MaxPrintInterval = 7
+  $PrintInterval = 1
+
   $timer = [Diagnostics.Stopwatch]::StartNew()
 
-  $runningJobs = $jobs | Where-Object { $_.State -eq "Running" }
+  $runningJobs = $jobs | Where-Object { $_ -and ($_.State -eq "Running") }
   while(($runningJobs) -and ($timer.Elapsed.TotalSeconds -lt $secTimeout)) {
 
     $runningJobs | Receive-job -Keep -ErrorAction Continue                # Show partial results
     $runningJobs | Wait-Job -Timeout $RetryIntervalSec | Show-JobProgress # Show progress bar
 
-    $totalSecs = [math]::Round($timer.Elapsed.TotalSeconds,0)
-    Write-Host "Passed: $totalSecs seconds, or $( [math]::Round($totalSecs / 60,1)) minutes, or $( [math]::Round($totalSecs / 60 / 60,1)) hours ..." -ForegroundColor Yellow
+    if($PrintInterval -ge $MaxPrintInterval) {
+      $totalSecs = [math]::Round($timer.Elapsed.TotalSeconds,0)
+      Write-Host "Passed: $totalSecs seconds, or $( [math]::Round($totalSecs / 60,1)) minutes, or $( [math]::Round($totalSecs / 60 / 60,1)) hours ..." -ForegroundColor Yellow
+      $PrintInterval = 1
+    } else {
+      $PrintInterval += 1
+    }
 
-    $runningJobs = $jobs | Where-Object { $_.State -eq "Running" }
+    $runningJobs = $jobs | Where-Object { $_ -and ($_.State -eq "Running") }
   }
+
   $timer.Stop()
   Write-Host ""
   Write-Host "JOBS STATUS"
