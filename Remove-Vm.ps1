@@ -6,21 +6,27 @@ param
   [Parameter(Mandatory=$true, HelpMessage="RG of lab to remove")]
   [string] $ResourceGroupName,
 
-  [Parameter(Mandatory=$false, HelpMessage="Pattern of VM to remove")]
-  [string] $Pattern = "Windows - Lab",
+  [Parameter(Mandatory=$false, HelpMessage="ImagePattern of VM to remove")]
+  [string] $ImagePattern = "Windows - Lab",
 
   [ValidateSet("Note","Name")]
   [Parameter(Mandatory=$true, HelpMessage="Property of the VM to match by (Name, Note)")]
-  [string] $MatchBy
+  [string] $MatchBy,
+
+  [Parameter(valueFromRemainingArguments=$true)]
+  [String[]]
+  $rest = @()
 )
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = "Stop"
+
+. "./Utils.ps1"
 
 function Select-Vms {
   param ($vms)
 
-  if($Pattern) {
-    $patterns = $Pattern.Split(",").Trim()
+  if($ImagePattern) {
+    $patterns = $ImagePattern.Split(",").Trim()
 
     # Severely in need of a linq query to do this ...
     $newVms = @()
@@ -33,15 +39,14 @@ function Select-Vms {
         }
       }
     }
-
     if(-not $newVms) {
-      throw "No vm selected by the pattern chosen"
+      throw "No vm selected by the ImagePattern chosen in $DevTestLabName"
     }
 
     return $newVms
   }
 
-  return $vms # No pattern passed
+  return $vms # No ImagePattern passed
 }
 
 Write-Host "Removing Vms from lab $DevTestLabName in $ResourceGroupName"
@@ -55,10 +60,4 @@ $selectedVms | ForEach-Object {
     Start-Sleep -Seconds 2
 }
 
-$jobCount = $jobs.Count
-Write-Host "Waiting for $jobCount Lab Vms deletion jobs to complete in $DevTestLabName"
-foreach ($job in $jobs){
-    $jobOutput = Receive-Job $job -Wait
-    Write-Host $jobOutput
-}
-Remove-Job -Job $jobs
+Wait-JobWithProgress -secTimeout (2 * 60 * 60) -jobs $jobs

@@ -5,7 +5,6 @@ param
     [string] $ConfigFile = "configTest.csv"
 )
 
-$error.Clear()
 $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"

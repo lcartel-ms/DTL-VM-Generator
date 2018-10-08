@@ -149,7 +149,8 @@ function Invoke-ForEachLab {
     [string] $customRole = "No VM Creation User",
     [string] $ImagePattern = "",
     [string] $IfExist = "Leave",
-    [int] $SecTimeout = 5 * 60 * 60
+    [int] $SecTimeout = 5 * 60 * 60,
+    [string] $MatchBy = ""
   )
 
   $config = Import-Csv $ConfigFile
@@ -197,7 +198,8 @@ function Invoke-ForEachLab {
       LabUsers= @($userStr);
       CustomRole='$($customRole)';
       ImagePattern='$($ImagePattern)';
-      IfExist='$($IfExist)'
+      IfExist='$($IfExist)';
+      MatchBy='$($MatchBy)'
     }"
 
     $sb = [scriptblock]::create(
