@@ -14,7 +14,7 @@ param
 
 $ErrorActionPreference = "Stop"
 
-$existingVms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -Name "*$DevTestLabName*" | Where-Object { $_.Name -like "$DevTestLabName/*"}
+$vms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName -ExpandProperties -Name "$DevTestLabName/"
 $runningVms = @()
 
 foreach ($vm in $vms) {
