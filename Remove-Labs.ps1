@@ -5,10 +5,9 @@ param
     [string] $ConfigFile = "configTest.csv"
 )
 
-$error.Clear()
 $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"
 
-"./Remove-Lab.ps1" | Invoke-ForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop 2 -SecTimeout (1 * 60 * 60)
+"./Remove-Lab.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop 2 -SecTimeout (1 * 60 * 60)
 

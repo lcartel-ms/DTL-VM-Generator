@@ -15,7 +15,6 @@ param
     [string] $IfExist
 )
 
-$error.Clear()
 $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"

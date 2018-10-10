@@ -55,9 +55,20 @@ $selectedVms = Select-Vms $vms
 
 $jobs = @()
 
-$selectedVms | ForEach-Object {
-    $jobs += Remove-AzureRmResource -AsJob -ResourceId $_.ResourceId -Force
+foreach($vm in $selectedVms) {
+
+    $Resid = $vm.ResourceId
+    Write-Host "Deleting $Resid"
+
+    $sb = [scriptblock]::create(
+    @"
+    Remove-AzureRmResource -ResourceId $Resid -Force
+"@)
+
+    $jobs += Start-RSJob -ScriptBlock $sb -Name $vm.Name
+
+
     Start-Sleep -Seconds 2
 }
 
-Wait-JobWithProgress -secTimeout (2 * 60 * 60) -jobs $jobs
+Wait-RSJobWithProgress -secTimeout (2 * 60 * 60) -jobs $jobs

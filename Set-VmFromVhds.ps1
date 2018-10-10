@@ -15,10 +15,8 @@ param
     [string] $IfExist
 )
 
-$error.Clear()
 $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"
 
-"./Set-VmFromVhd.ps1" | Invoke-ForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -CustomRole $null -ImagePattern $ImagePattern -IfExist $IfExist
-
+"./Set-VmFromVhd.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -CustomRole $null -ImagePattern $ImagePattern -IfExist $IfExist

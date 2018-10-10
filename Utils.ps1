@@ -28,56 +28,6 @@ function Set-LabAccessControl {
   }
 }
 
-function Show-JobProgress {
-  [CmdletBinding()]
-  param(
-      [Parameter(Mandatory,ValueFromPipeline)]
-      [ValidateNotNullOrEmpty()]
-      [System.Management.Automation.Job[]]
-      $Job
-      ,
-      [Parameter()]
-      [ValidateNotNullOrEmpty()]
-      [scriptblock]
-      $FilterScript
-  )
-
-  Process {
-      # if you have 'strict' mode on, you can't check for the existence of a property
-      # by using the dot notation, because it triggers a 'property don't exist exception'
-      if(-not ("ChildJobs" -in $job.PSobject.Properties.Name)) {
-        Write-Host "No Childjobs for this job ..."
-        return
-      }
-      $Job.ChildJobs | ForEach-Object {
-          if (-not $_.Progress) {
-              return
-          }
-
-          $LastProgress = $_.Progress
-          if ($FilterScript) {
-              $LastProgress = $LastProgress | Where-Object -FilterScript $FilterScript
-          }
-
-          $LastProgress | Group-Object -Property Activity,StatusDescription | ForEach-Object {
-              $_.Group | Select-Object -Last 1
-
-          } | ForEach-Object {
-              $ProgressParams = @{}
-              if ($_.Activity          -and $_.Activity          -ne $null) { $ProgressParams.Add('Activity',         $_.Activity) }
-              if ($_.StatusDescription -and $_.StatusDescription -ne $null) { $ProgressParams.Add('Status',           $_.StatusDescription) }
-              if ($_.CurrentOperation  -and $_.CurrentOperation  -ne $null) { $ProgressParams.Add('CurrentOperation', $_.CurrentOperation) }
-              if ($_.ActivityId        -and $_.ActivityId        -gt -1)    { $ProgressParams.Add('Id',               $_.ActivityId) }
-              if ($_.ParentActivityId  -and $_.ParentActivityId  -gt -1)    { $ProgressParams.Add('ParentId',         $_.ParentActivityId) }
-              if ($_.PercentComplete   -and $_.PercentComplete   -gt -1)    { $ProgressParams.Add('PercentComplete',  $_.PercentComplete) }
-              if ($_.SecondsRemaining  -and $_.SecondsRemaining  -gt -1)    { $ProgressParams.Add('SecondsRemaining', $_.SecondsRemaining) }
-
-              Write-Progress @ProgressParams
-          }
-      }
-  }
-}
-
 function Select-VmSettings {
   param (
     $sourceImageInfos,
@@ -204,85 +154,6 @@ function Wait-JobWithProgress {
   }
 }
 
-function Invoke-ForEachLab {
-  param
-  (
-    [parameter(ValueFromPipeline)]
-    [string] $script,
-    [string] $ConfigFile = "config.csv",
-    [int] $SecondsBetweenLoops =  10,
-    [string] $customRole = "No VM Creation User",
-    [string] $ImagePattern = "",
-    [string] $IfExist = "Leave",
-    [int] $SecTimeout = 5 * 60 * 60,
-    [string] $MatchBy = ""
-  )
-
-  $config = Import-Csv $ConfigFile
-
-  $jobs = @()
-
-  $config | ForEach-Object {
-    $lab = $_
-    Write-Host "Starting operating on $($lab.DevTestLabName) ..."
-
-    # We are getting a string from the csv file, so we need to split it
-    if($lab.LabOwners) {
-        $ownAr = $lab.LabOwners.Split(",").Trim()
-    } else {
-        $ownAr = @()
-    }
-    if($lab.LabUsers) {
-        $userAr = $lab.LabUsers.Split(",").Trim()
-    } else {
-        $userAr = @()
-    }
-
-    # The scripts that operate over a single lab need to have an uniform number of parameters so that they can be invoked by Invoke-ForeachLab.
-    # The argumentList of star-job just allows passing arguments positionally, so it can't be used if the scripts have arguments in different positions.
-    # To workaround that, a string gets generated that embed the script as text and passes the parameters by name instead
-    # Also, a valueFromRemainingArguments=$true parameter needs to be added to the single lab script
-    # So we achieve the goal of reusing the Invoke-Foreach function for everything, while still keeping the single lab scripts clean for the caller
-    # The price we pay for the above is the crazy code below, which is likely quite bug prone ...
-    $formatOwners = $ownAr | ForEach-Object { "'$_'"}
-    $ownStr = $formatOwners -join ","
-    $formatUsers = $userAr | ForEach-Object { "'$_'"}
-    $userStr = $formatUsers -join ","
-
-    $initScript = [scriptblock]::create("Set-Location ""$PWD""")
-    $params = "@{
-      DevTestLabName='$($lab.DevTestLabName)';
-      ResourceGroupName='$($lab.ResourceGroupName)';
-      StorageAccountName='$($lab.StorageAccountName)';
-      StorageContainerName='$($lab.StorageContainerName)';
-      StorageAccountKey='$($lab.StorageAccountKey)';
-      ShutDownTime='$($lab.ShutDownTime)';
-      TimezoneId='$($lab.TimezoneId)';
-      LabRegion='$($lab.LabRegion)';
-      LabOwners= @($ownStr);
-      LabUsers= @($userStr);
-      CustomRole='$($customRole)';
-      ImagePattern='$($ImagePattern)';
-      IfExist='$($IfExist)';
-      MatchBy='$($MatchBy)'
-    }"
-
-    $sb = [scriptblock]::create(
-    @"
-    `$params=$params
-    .{$(get-content $script -Raw)} @params
-"@)
-
-    $jobs += Start-Job -Name $lab.DevTestLabName -InitializationScript $initScript -ScriptBlock $sb
-    Start-Sleep -Seconds $SecondsBetweenLoops
-  }
-
-  Wait-JobWithProgress -secTimeout $secTimeout -jobs $jobs
-}
-
-# MULTITHREADED VERSION OF CONFIG LOOP
-# Decided to keep both around because the one that uses processes, despite being more resource intensive,
-# gives better error messages, so it's ok for all script except maybe Set-VmFromVhds.ps1 which is quite resource intensive
 function Wait-RSJobWithProgress {
   param(
     [ValidateNotNullOrEmpty()]
@@ -392,7 +263,6 @@ function Invoke-RSForEachLab {
     $formatUsers = $userAr | ForEach-Object { "'$_'"}
     $userStr = $formatUsers -join ","
 
-    $initScript = [scriptblock]::create("Set-Location ""$PWD""")
     $params = "@{
       DevTestLabName='$($lab.DevTestLabName)';
       ResourceGroupName='$($lab.ResourceGroupName)';

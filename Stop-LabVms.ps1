@@ -15,7 +15,6 @@ Write-Host "This might take a while ..."
 
 # Get all VMs in lab expanding properties to get to compute VM
 $vms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName -ExpandProperties -Name "$DevTestLabName/"
-$runningVms = @()
 
 foreach ($vm in $vms) {
   $computeVm = Get-AzureRmResource -ResourceId $vm.Properties.computeId
@@ -37,10 +36,10 @@ foreach ($vm in $vms) {
     $returnStatus = Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "stop" -Force
 
     if ($returnStatus.Status -eq 'Succeeded') {
-      Write-Host "Successfully stopped DTL machine: $dtlName"
+      Write-Output "Successfully stopped DTL machine: $dtlName"
     }
     else {
-      Write-Error "Failed to stop DTL machine: $dtlName"
+      throw "Failed to stop DTL machine: $dtlName"
     }
   }
 }

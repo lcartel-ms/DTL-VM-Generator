@@ -12,7 +12,6 @@ param
     [string] $CustomRole =  "No VM Creation User"
 )
 
-$error.Clear()
 $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"

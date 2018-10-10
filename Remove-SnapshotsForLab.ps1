@@ -29,7 +29,7 @@ $snapshots | ForEach-Object {
   $sb = {
     Remove-AzureRmResource -ResourceId ($Using:_).ResourceId -Force -ApiVersion '2016-05-15'
   }
-  $jobs += Start-RSJob -ScriptBlock $sb -Name $deployName
+  $jobs += Start-RSJob -ScriptBlock $sb -Name $DevTestLabName
 }
 
 Wait-RSJobWithProgress -secTimeout (1 * 60 * 60) -jobs $jobs

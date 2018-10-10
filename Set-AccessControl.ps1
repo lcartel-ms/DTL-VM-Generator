@@ -1,18 +1,22 @@
 param
 (
     [Parameter(Mandatory=$false, HelpMessage="Configuration File, see example in directory")]
-    [string] $ConfigFile = "config.csv"
+    [string] $ConfigFile = "config.csv",
+
+    [Parameter(Mandatory=$false, HelpMessage="Custom Role to use")]
+    [string] $CustomRole = "No VM Creation User"
+
 )
 
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = "Stop"
 
-$error.Clear()
+. "./Utils.ps1"
 
 $config = Import-Csv $ConfigFile
 
-$customRole = "No VM Creation User"
 
 ForEach ($lab in $config) {
+
     $LabOwners = $lab.LabOwners
     $LabUsers = $lab.LabUsers
 
@@ -28,15 +32,7 @@ ForEach ($lab in $config) {
         $userAr = @()
     }
 
-    Write-Host $lab.DevTestLabName
-    foreach ($owneremail in $ownAr) {
-      Write-Host "$owneremail"
-      New-AzureRmRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $lab.ResourceGroupName -ResourceName $lab.DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs'
-    }
-
-    foreach ($useremail in $userAr) {
-      Write-Host "$useremail"
-      New-AzureRmRoleAssignment -SignInName $useremail -RoleDefinitionName $customRole -ResourceGroupName $lab.ResourceGroupName -ResourceName $lab.DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs'
-    }
-
+    Set-LabAccessControl -DevTestLabName $lab.DevTestLabName -ResourceGroupName $lab.ResourceGroupName -customRole $customRole -ownAr $ownAr -userAr $userAr -ErrorAction Continue
+    Write-Host "Access control set for $DevTestLabName"
 }
+Write-Output "Access control set correctly"

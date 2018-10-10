@@ -14,7 +14,18 @@ param
 
 $ErrorActionPreference = "Stop"
 
+$existingLab = Get-AzureRmResource -Name $DevTestLabName  -ResourceGroupName $ResourceGroupName
+
+if (-not $existingLab) {
+    throw "'$DevTestLabName' Doesn't exist"
+}
+
 $vms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName -ExpandProperties -Name "$DevTestLabName/"
+
+if(-not $vms) {
+  throw "No VMs in $DevTestLabName"
+}
+
 $runningVms = @()
 
 foreach ($vm in $vms) {
@@ -39,4 +50,4 @@ if($runningVms) {
 } else {
   $runString = 'None'
 }
-Write-Host "RUNNING VMS FOR LAB $DevTestLabName : $runString"
+Write-Output "RUNNING VMS FOR LAB $DevTestLabName : $runString"

@@ -14,4 +14,5 @@ param
 $ErrorActionPreference = "Stop"
 
 Write-Host "Removing lab $DevTestLabName in $ResourceGroupName"
-Remove-AzureRmResource -ResourceGroupName $ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs" -ResourceName $DevTestLabName -Force
+Remove-AzureRmResource -ResourceGroupName $ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs" -ResourceName $DevTestLabName -Force | Out-Null
+Write-Output "$DevTestLabName removed."

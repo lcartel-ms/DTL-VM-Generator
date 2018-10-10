@@ -8,7 +8,6 @@ param
     [string] $ActionFile = ".\NoVMCreationRole.json"
 )
 
-$error.Clear()
 $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"
