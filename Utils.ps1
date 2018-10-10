@@ -8,6 +8,15 @@
 
 Set-StrictMode -Version Latest
 
+# Import a patched up version of this module because the standard release
+# doesn't propagate Write-host messages to console
+# see https://github.com/proxb/PoshRSJob/pull/158/commits/b64ad9f5fbe6fa85f860311f81ec0d6392d5fc01
+if (Get-Module | Where-Object {$_.Name -eq "PoshRSJob"}) {
+} else {
+  Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+  Import-Module "$PSScriptRoot\PoshRSJob\PoshRSJob.psm1"
+}
+
 function Set-LabAccessControl {
   param(
     $DevTestLabName,
@@ -222,15 +231,6 @@ function Invoke-RSForEachLab {
     [int] $SecTimeout = 5 * 60 * 60,
     [string] $MatchBy = ""
   )
-
-  # Import a patched up version of this module because the standard release
-  # doesn't propagate Write-host messages to console
-  # see https://github.com/proxb/PoshRSJob/pull/158/commits/b64ad9f5fbe6fa85f860311f81ec0d6392d5fc01
-  if (Get-Module | Where-Object {$_.Name -eq "PoshRSJob"}) {
-  } else {
-    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-    Import-Module "$PSScriptRoot\PoshRSJob\PoshRSJob.psm1"
-  }
 
   $config = Import-Csv $ConfigFile
 
