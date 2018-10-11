@@ -67,7 +67,6 @@ foreach($vm in $selectedVms) {
 
     $jobs += Start-RSJob -ScriptBlock $sb -Name $vm.Name
 
-
     Start-Sleep -Seconds 2
 }
 
