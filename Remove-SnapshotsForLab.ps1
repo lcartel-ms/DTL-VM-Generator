@@ -27,7 +27,7 @@ $jobs = @()
 
 $snapshots | ForEach-Object {
   $sb = {
-    Remove-AzureRmResource -ResourceId ($Using:_).ResourceId -Force -ApiVersion '2016-05-15'
+    Remove-AzureRmResource -ResourceId ($Using:_).ResourceId -Force -ApiVersion '2016-05-15' | Out-Null
   }
   $jobs += Start-RSJob -ScriptBlock $sb -Name $DevTestLabName
 }
