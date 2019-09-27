@@ -11,6 +11,7 @@ $roleDef.Actions.Add("Microsoft.DevTestLab/labs/virtualMachines/unclaim/action")
 $roleDef.Actions.Add("Microsoft.DevTestLab/labs/virtualMachines/start/action")
 $roleDef.Actions.Add("Microsoft.DevTestLab/labs/virtualMachines/stop/action")
 $roleDef.Actions.Add("Microsoft.DevTestLab/labs/virtualMachines/restart/action")
+$roleDef.Actions.Add("Microsoft.DevTestLab/labs/virtualMachines/getRdpFileContents/action")
 
 Set-AzureRmRoleDefinition -Role $roleDef
 
