@@ -35,7 +35,8 @@
         "Microsoft.Resources/deployments/operations/read",
         "Microsoft.Resources/deployments/read",
         "Microsoft.Resources/subscriptions/resourceGroups/read",
-        "Microsoft.Storage/storageAccounts/listKeys/action"
+        "Microsoft.Storage/storageAccounts/listKeys/action",
+        "Microsoft.DevTestLab/labs/virtualMachines/getRdpFileContents/action"
     ],
     "NotActions": [
         "Microsoft.Compute/virtualMachines/vmSizes/read"
