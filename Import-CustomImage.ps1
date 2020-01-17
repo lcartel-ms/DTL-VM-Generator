@@ -32,9 +32,9 @@ if(-not $VmSettings) {
   $VmSettings = & "./Import-VmSetting" -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
 }
 
-$lab = Get-AzureRmResource -Name $DevTestLabName -ResourceGroupName $ResourceGroupName
+$lab = Get-AzDtlLab -Name $DevTestLabName -ResourceGroupName $ResourceGroupName
 
-if ($lab -eq $null) {
+if ($null -eq $lab) {
     throw "'$DevTestLabName' Lab doesn't exist, can't copy images to it"
 }
 
@@ -48,39 +48,39 @@ if(-not $scriptFolder) {
 # Get the storage account for the lab (temp holding spot for VHDs)
 # ------------------------------------------------------------------
 $labRgName= $ResourceGroupName
-$sourceLab = Get-AzureRmResource -ResourceName $lab.Name -ResourceGroupName $labRgName -ResourceType 'Microsoft.DevTestLab/labs'
+$sourceLab = Get-AzResource -ResourceName $lab.Name -ResourceGroupName $labRgName -ResourceType 'Microsoft.DevTestLab/labs'
 $DestStorageAccountResourceId = $sourceLab.Properties.artifactsStorageAccount
 $DestStorageAcctName = $DestStorageAccountResourceId.Substring($DestStorageAccountResourceId.LastIndexOf('/') + 1)
-$storageAcct = (Get-AzureRMStorageAccountKey  -StorageAccountName $DestStorageAcctName -ResourceGroupName $labRgName)
+$storageAcct = (Get-AzStorageAccountKey -StorageAccountName $DestStorageAcctName -ResourceGroupName $labRgName)
 $DestStorageAcctKey = $storageAcct.Value[0]
 
-$DestStorageContext = New-AzureStorageContext -StorageAccountName $DestStorageAcctName -StorageAccountKey $DestStorageAcctKey
+$DestStorageContext = New-AzStorageContext -StorageAccountName $DestStorageAcctName -StorageAccountKey $DestStorageAcctKey
 
 # ------------------------------------------------------------------
 # Next we copy each of the images to the DevTest Lab's storage account
 # ------------------------------------------------------------------
-$SourceStorageContext = New-AzureStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $StorageAccountKey
+$SourceStorageContext = New-AzStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $StorageAccountKey
 
 $copyHandles = @()
 
 foreach ($sourceImage in $VmSettings) {
     $srcURI = $SourceStorageContext.BlobEndPoint + "$StorageContainerName/" + $sourceImage.vhdFileName
     # Create it if it doesn't exist...
-    New-AzureStorageContainer -Context $DestStorageContext -Name 'uploads' -ErrorAction Ignore
+    New-AzStorageContainer -Context $DestStorageContext -Name 'uploads' -ErrorAction Ignore
     # Initiate all the file copies
-    $copyHandles += Start-AzureStorageBlobCopy -srcUri $srcURI -SrcContext $SourceStorageContext -DestContainer 'uploads' -DestBlob $sourceImage.vhdFileName -DestContext $DestStorageContext -Force
+    $copyHandles += Start-AzStorageBlobCopy -srcUri $srcURI -SrcContext $SourceStorageContext -DestContainer 'uploads' -DestBlob $sourceImage.vhdFileName -DestContext $DestStorageContext -Force
     Write-Host ("Started copying " + $sourceImage.vhdFileName + " to " + $DestStorageAcctName + " at " + (Get-Date -format "h:mm:ss tt"))
 }
 
-$copyStatus = $copyHandles | Get-AzureStorageBlobCopyState
+$copyStatus = $copyHandles | Get-AzStorageBlobCopyState
 
-while (($copyStatus | Where-Object {$_.Status -eq "Pending"}) -ne $null) {
+while ($null -ne ($copyStatus | Where-Object {$_.Status -eq "Pending"})) {
     $copyStatus | Where-Object {$_.Status -eq "Pending"} | ForEach-Object {
         [int]$perComplete = ($_.BytesCopied/$_.TotalBytes)*100
         Write-Host ("    Copying " + $($_.Source.Segments[$_.Source.Segments.Count - 1]) + " to " + $DestStorageAcctName + " - $perComplete% complete" )
     }
     Start-Sleep -Seconds 60
-    $copyStatus = $copyHandles | Get-AzureStorageBlobCopyState
+    $copyStatus = $copyHandles | Get-AzStorageBlobCopyState
 }
 
 # Copies are complete by this point, but we need to check for errors
@@ -93,33 +93,17 @@ $copyStatus | Where-Object {$_.Status -eq "Success"} | ForEach-Object {
 }
 
 # ------------------------------------------------------------------
-# Once copies are done, we need to create 'custom images' that use the VHDs by deploying an ARM template
+# Once copies are done, we need to create 'custom images' that use the VHDs
 # ------------------------------------------------------------------
-
-$templatePath = Join-Path $scriptFolder "CreateImageFromVHD.json"
 
 foreach ($sourceImage in $VmSettings) {
 
     $vhdUri = $DestStorageContext.BlobEndPoint + "uploads/" + $sourceImage.vhdFileName
 
-    $deployName = "Deploy-$DevTestLabName-$($sourceImage.vhdFileName)"
-
     # Making it unique otherwise the generated Managed Disk created in the RG ends up having the same name
-    $uniqueImageName = $DevTestLabName + $sourceImage.imageName
-    $deployResult = New-AzureRmResourceGroupDeployment -Name $deployName -ResourceGroupName $labRgName -TemplateFile $templatePath -existingLabName $DevTestLabName -existingVhdUri $vhdUri -imageOsType $sourceImage.osType -imageName $uniqueImageName -imageDescription $sourceImage.description
+    $uniqueImageName = $DevTestLabName + $sourceImage.imageName    
 
-    # Delete the VHD, we don't need it after the custom image is created, since it uses managed images
-    Remove-AzureStorageBlob -Context $DestStorageContext -Container 'uploads' -Blob $sourceImage.vhdFileName | Out-Null
-
-    # Remove Deployment
-    Remove-AzureRmResourceGroupDeployment -ResourceGroupName $labRgName -Name $deployName  -ErrorAction SilentlyContinue | Out-Null
-
-    if($deployResult.ProvisioningState -eq "Succeeded"){
-        Write-Host "Successfully deployed custom image $($sourceImage.vhdFileName) to Lab $DevTestLabName"
-    }
-    else {
-        throw "Image deploy failed for custom image $($sourceImage.vhdFileName) to Lab $DevTestLabName"
-    }
+    Import-AzDtlCustomImageFromUri -Lab $lab -Uri $vhdUri -ImageOsType $sourceImage.osType -ImageName $uniqueImageName -ImageDescription $sourceImage.description
 }
 
 Write-Output "Copied all images to $DevTestLabName"

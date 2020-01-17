@@ -19,4 +19,6 @@ $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"
 
-"./Set-VmFromVhd.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -CustomRole $null -ImagePattern $ImagePattern -IfExist $IfExist
+Import-AzDtlModule
+
+"./Create-Vm.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -CustomRole $null -ImagePattern $ImagePattern -IfExist $IfExist -ModulesToImport $AzDtlModulePath

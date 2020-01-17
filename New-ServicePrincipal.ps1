@@ -6,7 +6,7 @@ param
     [string] $ApplicationDisplayName
 
 )
-Import-Module AzureRM.Resources
+Import-Module Az.Resources
 
 # Generate password lifted from this location: https://blogs.technet.microsoft.com/heyscriptingguy/2015/11/05/generate-random-letters-with-powershell/
 Function Get-NewPassword() {
@@ -17,13 +17,13 @@ Function Get-NewPassword() {
     return (-join ((48..57) + (65..90) + (97..122) | Get-Random -Count $length | % {[char]$_}))
 }
 
-$sub = Get-AzureRmSubscription -SubscriptionId $SubscriptionId
+$sub = Get-AzSubscription -SubscriptionId $SubscriptionId
 
 $ServicePrincipalPasswordPlainText = Get-NewPassword
 $ServicePrincipalPassword = ConvertTo-SecureString -String $ServicePrincipalPasswordPlainText -AsPlainText -Force
 
 # Create the service principal!
-$ServicePrincipal = New-AzureRMADServicePrincipal -DisplayName $ApplicationDisplayName -Password $ServicePrincipalPassword
+$ServicePrincipal = New-AzADServicePrincipal -DisplayName $ApplicationDisplayName -Password $ServicePrincipalPassword
 
 Write-Host "--------------------------------------------------"
 Write-Host "Service Principle Information"
@@ -38,5 +38,5 @@ Write-Host "--------------------------------------------------"
 
 Start-Sleep -Seconds 30
 
-New-AzureRmRoleAssignment -ObjectId $ServicePrincipal.Id -Scope "/subscriptions/$($sub.Id)" -RoleDefinitionName "Contributor"
+New-AzRoleAssignment -ObjectId $ServicePrincipal.Id -Scope "/subscriptions/$($sub.Id)" -RoleDefinitionName "Contributor"
 

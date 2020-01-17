@@ -9,5 +9,6 @@ $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"
 
-"./Remove-Lab.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop 2 -SecTimeout (1 * 60 * 60)
+Import-AzDtlModule
 
+"./Remove-SnapshotsForLab.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop 2 -ModulesToImport $AzDtlModulePath

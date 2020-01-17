@@ -1,6 +1,6 @@
 $customRole = "No VM Creation User"
 
-$roleDef = Get-AzureRmRoleDefinition -Name $customRole
+$roleDef = Get-AzRoleDefinition -Name $customRole
 
 if(-not $roleDef) {
   Write-Error "No role $customRole in the subscription"
@@ -13,5 +13,5 @@ $roleDef.Actions.Add("Microsoft.DevTestLab/labs/virtualMachines/stop/action")
 $roleDef.Actions.Add("Microsoft.DevTestLab/labs/virtualMachines/restart/action")
 $roleDef.Actions.Add("Microsoft.DevTestLab/labs/virtualMachines/getRdpFileContents/action")
 
-Set-AzureRmRoleDefinition -Role $roleDef
+Set-AzRoleDefinition -Role $roleDef
 

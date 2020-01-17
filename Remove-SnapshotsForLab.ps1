@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "Removing snapshots for lab $DevTestLabName in $ResourceGroupName"
 
-$snapshots = Get-AzureRmResource -ResourceType 'Microsoft.DevTestLab/labs/customImages' -ResourceName $DevTestLabName -ResourceGroupName $ResourceGroupName -ApiVersion '2016-05-15'
+$snapshots = Get-AzResource -ResourceType 'Microsoft.DevTestLab/labs/customImages' -ResourceName $DevTestLabName -ResourceGroupName $ResourceGroupName -ApiVersion '2016-05-15'
 
 if(-not $snapshots) {
   return "No snapshots to remove in $DevTestLabName"
@@ -27,7 +27,7 @@ $jobs = @()
 
 $snapshots | ForEach-Object {
   $sb = {
-    Remove-AzureRmResource -ResourceId ($Using:_).ResourceId -Force -ApiVersion '2016-05-15' | Out-Null
+    Remove-AzResource -ResourceId ($Using:_).ResourceId -Force -ApiVersion '2016-05-15' | Out-Null
   }
   $jobs += Start-RSJob -ScriptBlock $sb -Name $DevTestLabName
 }

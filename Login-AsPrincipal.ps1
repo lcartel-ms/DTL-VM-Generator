@@ -15,4 +15,4 @@ $secpasswd = ConvertTo-SecureString $PrincipalKey -AsPlainText -Force
 $pscreds = New-Object System.Management.Automation.PSCredential ($PrincipalAppId, $secpasswd)
 
 # Log into Azure with the service principal
-Login-AzureRmAccount -ServicePrincipal -Tenant $TenantId -Credential $pscreds
+Login-AzAccount -ServicePrincipal -Tenant $TenantId -Credential $pscreds

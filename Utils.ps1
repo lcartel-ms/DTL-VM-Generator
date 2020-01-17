@@ -17,6 +17,38 @@ if (Get-Module | Where-Object {$_.Name -eq "PoshRSJob"}) {
   Import-Module "$PSScriptRoot\PoshRSJob\PoshRSJob.psm1"
 }
 
+# DTL Module dependency
+$AzDtlModuleName = "Az.DevTestLabs2.psm1"
+$AzDtlModuleSource = "https://raw.githubusercontent.com/Azure/azure-devtestlab/master/samples/DevTestLabs/Modules/Library/Az.DevTestLabs2.psm1"
+
+# To be passed as 'ModulesToImport' param when starting a RSJob
+$global:AzDtlModulePath = Join-Path -Path (Resolve-Path ./) -ChildPath $AzDtlModuleName
+
+function Import-RemoteModule {
+  param(
+    [ValidateNotNullOrEmpty()]
+    [string] $Source,
+    [ValidateNotNullOrEmpty()]
+    [string] $ModuleName
+  )
+
+  $modulePath = Join-Path -Path (Resolve-Path ./) -ChildPath $ModuleName
+
+  if (Test-Path -Path $modulePath) {
+    # if the file exists, delete it - just in case there's a newer version, we always download the latest
+    Remove-Item -Path $modulePath
+}
+
+  $WebClient = New-Object System.Net.WebClient
+  $WebClient.DownloadFile($Source, $modulePath)
+
+  Import-Module $modulePath
+}
+
+function Import-AzDtlModule {
+  Import-RemoteModule -Source $AzDtlModuleSource -ModuleName $AzDtlModuleName
+}
+
 function Set-LabAccessControl {
   param(
     $DevTestLabName,
@@ -27,12 +59,12 @@ function Set-LabAccessControl {
   )
 
   foreach ($owneremail in $ownAr) {
-    New-AzureRmRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
+    New-AzRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
     Write-Host "$owneremail added as Owner"
   }
 
   foreach ($useremail in $userAr) {
-    New-AzureRmRoleAssignment -SignInName $useremail -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
+    New-AzRoleAssignment -SignInName $useremail -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
     Write-Host "$useremail added as $customRole"
   }
 }
@@ -76,14 +108,14 @@ function ManageExistingVM {
 
   $VmSettings | ForEach-Object {
     $vmName = $_.imageName
-    $existingVms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -Name "*$DevTestLabName*" | Where-Object { $_.Name -eq "$DevTestLabName/$vmName"}
+    $existingVms = Get-AzResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -Name "*$DevTestLabName*" | Where-Object { $_.Name -eq "$DevTestLabName/$vmName"}
 
     if($existingVms) {
       Write-Host "Found an existing VM $vmName in $DevTestLabName"
       if($IfExist -eq "Delete") {
         Write-Host "Deleting VM $vmName in $DevTestLabName"
         $vmToDelete = $existingVms[0]
-        Remove-AzureRmResource -ResourceId $vmToDelete.ResourceId -Force | Out-Null
+        Remove-AzResource -ResourceId $vmToDelete.ResourceId -Force | Out-Null
         $newSettings += $_
       } elseif ($IfExist -eq "Leave") {
         Write-Host "Leaving VM $vmName  in $DevTestLabName be, not moving forward ..."
@@ -98,6 +130,37 @@ function ManageExistingVM {
     }
   }
   return $newSettings
+}
+
+function Show-JobProgress {
+  [CmdletBinding()]
+  param(
+      [Parameter(Mandatory,ValueFromPipeline)]
+      [ValidateNotNullOrEmpty()]
+      [System.Management.Automation.Job[]]
+      $Job
+  )
+
+  Process {
+      $Job.ChildJobs | ForEach-Object {
+          if (-not $_.Progress) {
+              return
+          }
+
+          $_.Progress |Select-Object -Last 1 | ForEach-Object {
+              $ProgressParams = @{}
+              if ($_.Activity          -and $null -ne $_.Activity) { $ProgressParams.Add('Activity',         $_.Activity) }
+              if ($_.StatusDescription -and $null -ne $_.StatusDescription) { $ProgressParams.Add('Status',           $_.StatusDescription) }
+              if ($_.CurrentOperation  -and $null -ne $_.CurrentOperation) { $ProgressParams.Add('CurrentOperation', $_.CurrentOperation) }
+              if ($_.ActivityId        -and $_.ActivityId        -gt -1)    { $ProgressParams.Add('Id',               $_.ActivityId) }
+              if ($_.ParentActivityId  -and $_.ParentActivityId  -gt -1)    { $ProgressParams.Add('ParentId',         $_.ParentActivityId) }
+              if ($_.PercentComplete   -and $_.PercentComplete   -gt -1)    { $ProgressParams.Add('PercentComplete',  $_.PercentComplete) }
+              if ($_.SecondsRemaining  -and $_.SecondsRemaining  -gt -1)    { $ProgressParams.Add('SecondsRemaining', $_.SecondsRemaining) }
+
+              Write-Progress @ProgressParams
+          }
+      }
+  }
 }
 
 function Wait-JobWithProgress {
@@ -229,7 +292,8 @@ function Invoke-RSForEachLab {
     [string] $ImagePattern = "",
     [string] $IfExist = "Leave",
     [int] $SecTimeout = 5 * 60 * 60,
-    [string] $MatchBy = ""
+    [string] $MatchBy = "",
+    [string[]] $ModulesToImport
   )
 
   $config = Import-Csv $ConfigFile
@@ -282,12 +346,12 @@ function Invoke-RSForEachLab {
 
     $sb = [scriptblock]::create(
     @"
-    Set-Location `$Using:PWD
+    `Set-Location `$Using:PWD
     `$params=$params
     .{$(get-content $script -Raw)} @params
 "@)
 
-    $jobs += Start-RSJob -Name $lab.DevTestLabName -ScriptBlock $sb
+    $jobs += Start-RSJob -Name $lab.DevTestLabName -ScriptBlock $sb -ModulesToImport $ModulesToImport
     Start-Sleep -Seconds $SecondsBetweenLoops
   }
 

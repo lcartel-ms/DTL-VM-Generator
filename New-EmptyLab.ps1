@@ -9,11 +9,11 @@ param
     [string] $ResourceGroupName,
 
     [ValidateNotNullOrEmpty()]
-    [Parameter(HelpMessage="The Region for the DevTest Lab")]
+    [Parameter(HelpMessage="The time (relative to timeZoneId) at which the Lab VMs will be automatically shutdown (E.g. 17:30, 20:00, 09:00)")]
     [string] $ShutDownTime = "1900",
 
     [ValidateNotNullOrEmpty()]
-    [Parameter(HelpMessage="The Region for the DevTest Lab")]
+    [Parameter(HelpMessage="The Windows time zone id associated with labVmShutDownTime (E.g. UTC, Pacific Standard Time, Central Europe Standard Time)")]
     [string] $TimeZoneId = "W. Europe Standard Time",
 
     [ValidateNotNullOrEmpty()]
@@ -43,36 +43,28 @@ if ($DevTestLabName.Length -gt 50) {
     throw "'$DevTestLabName' is too long, must be 50 characters or less"
 }
 
-if ($DevTestLabName.Length -gt 40) {
-    $deploymentName = "Create_new_lab_" + $DevTestLabName.Substring(0, 40)
-}
-else {
-    $deploymentName = "Create_new_lab_" + $DevTestLabName
-}
+$existingLab = Get-AzResource -Name $DevTestLabName -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue
 
-$existingLab = Get-AzureRmResource -Name $DevTestLabName  -ResourceGroupName $ResourceGroupName
-
-if ($existingLab -ne $null) {
+if ($null -ne $existingLab) {
     throw "'$DevTestLabName' Lab already exists, can't create this one!  Unable to proceed."
 }
 else {
     Write-Host "Creating lab '$DevTestLabName'"
 
     # The SilentlyContinue bit is to suppress the error that otherwise this generates.
-    $existingRg = Get-AzureRmResourceGroup -Name $ResourceGroupName -Location $LabRegion -ErrorAction SilentlyContinue
+    $existingRg = Get-AzResourceGroup -Name $ResourceGroupName -Location $LabRegion -ErrorAction SilentlyContinue
 
     if(-not $existingRg) {
       Write-Host "Creating Resource Group '$ResourceGroupName' ..."
-      New-AzureRmResourceGroup -Name $ResourceGroupName -Location $LabRegion | Out-Null
+      New-AzResourceGroup -Name $ResourceGroupName -Location $LabRegion | Out-Null
     }
 
-    Write-Host "Starting deployment of lab $DevTestLabName ..."
-    New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile (Join-Path $pwd.Path "New-DevTestLab.json") -devTestLabName $DevTestLabName -region $LabRegion -shutdowntime $ShutDownTime -timezoneid $TimeZoneId | out-null
+    Write-Host "Starting creation of lab $DevTestLabName ..."
 
-    # You can easily run out of deployments. The drawback is that it doesn't remember failures, but doesn't seem to be needed to access logs.
-    Write-Host "Deleting deployments ..."
-    Remove-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName  -ErrorAction SilentlyContinue | Out-Null
-
+    # Use new DTL Library here
+    New-AzDtlLab -Name $DevTestLabName -ResourceGroupName $ResourceGroupName `
+        | Set-AzDtlLabShutdown -ShutdownTime $ShutDownTime -TimeZoneId $TimeZoneId
+    
     Set-LabAccessControl $DevTestLabName $ResourceGroupName $CustomRole $LabOwners $LabUsers
 
     Write-Output "Completed Creating the '$DevTestLabName' lab"

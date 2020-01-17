@@ -19,3 +19,6 @@ logs/*
 
 #Exclude Tests
 Test-*
+
+#Exclude DTL module
+Az.DevTestLabs2.psm1

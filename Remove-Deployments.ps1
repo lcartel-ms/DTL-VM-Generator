@@ -9,15 +9,15 @@ param
 
 Write-Host "Start removal ..."
 
-$deployments = Get-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName
+$deployments = Get-AzResourceGroupDeployment -ResourceGroupName $ResourceGroupName
 Write-Host "Deployments: $($deployments.Count)"
 
-$deploymentsToDelete = $deployments | where { $_.Timestamp -lt ((get-date).AddDays($HowManyDaysBefore)) }
+$deploymentsToDelete = $deployments | Where-Object { $_.Timestamp -lt ((get-date).AddDays($HowManyDaysBefore)) }
 
 foreach ($deployment in $deploymentsToDelete) {
         $deploymentName = $deployment.DeploymentName
         Write-Host "Removing deployment $deploymentName"
-        Remove-AzureRmResourceGroupDeployment -ResourceGroupName $ResourceGroupName -DeploymentName $deploymentName
+        Remove-AzResourceGroupDeployment -ResourceGroupName $ResourceGroupName -DeploymentName $deploymentName
 }
 
 Write-Host "All done!"

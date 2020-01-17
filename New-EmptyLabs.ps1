@@ -16,5 +16,7 @@ $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"
 
-"./New-EmptyLab.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -CustomRole $CustomRole
+Import-AzDtlModule
+
+"./New-EmptyLab.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -CustomRole $CustomRole -ModulesToImport $AzDtlModulePath
 

@@ -49,25 +49,28 @@ function Select-Vms {
   return $vms # No ImagePattern passed
 }
 
+$existingLab = Get-AzDtlLab -Name $DevTestLabName -ResourceGroupName $ResourceGroupName
+
+if (-not $existingLab) {
+    throw "'$DevTestLabName' Doesn't exist"
+}
+
 Write-Host "Removing Vms from lab $DevTestLabName in $ResourceGroupName"
-$vms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName -ExpandProperties -Name "$DevTestLabName/"
+$vms = Get-AzDtlVm -Lab $existingLab
+
 $selectedVms = Select-Vms $vms
 
 $jobs = @()
+$selectedVms | ForEach-Object {
 
-foreach($vm in $selectedVms) {
-
-    $Resid = $vm.ResourceId
-    Write-Host "Deleting $Resid"
-
-    $sb = [scriptblock]::create(
+  $sb = [scriptblock]::create(
     @"
-    Remove-AzureRmResource -ResourceId $Resid -Force
+    Remove-AzDtlVm -Vm $_
 "@)
 
-    $jobs += Start-RSJob -ScriptBlock $sb -Name $vm.Name
+  $jobs += Start-RSJob -ScriptBlock $sb -Name $_.Name -ModulesToImport $AzDtlModulePath
 
-    Start-Sleep -Seconds 2
+  Start-Sleep -Seconds 2
 }
 
 Wait-RSJobWithProgress -secTimeout (2 * 60 * 60) -jobs $jobs

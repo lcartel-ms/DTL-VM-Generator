@@ -31,7 +31,7 @@ if(-not $scriptFolder) {
 }
 
 # Get all VMs in lab expanding properties to get to compute VM
-$vms = Get-AzureRmResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName -ExpandProperties -Name "$DevTestLabName/"
+$vms = Get-AzResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName -ExpandProperties -Name "$DevTestLabName/"
 
 # Needs to run first through all the vms to get the private ip for the dns servers
 $nicsHash = @{}
@@ -47,10 +47,10 @@ $VmSettings | ForEach-Object {
   }
 
   # DANGER: this is implementation specific. Might change if DTL Changes how it stores compute info.
-  $computeVm = Get-AzureRmResource -ResourceId $vm.Properties.computeId
+  $computeVm = Get-AzResource -ResourceId $vm.Properties.computeId
   $computeGroup = $computeVm.ResourceGroupName
 
-  $nic = Get-AzureRmNetworkInterface -Name $vmName -ResourceGroupName $computeGroup
+  $nic = Get-AzNetworkInterface -Name $vmName -ResourceGroupName $computeGroup
   if(-not $nic) {
     throw "Can't find the NIC named $vmName in the compute group $computeGroup"
   }
@@ -82,7 +82,7 @@ $nicsHash.Keys | ForEach-Object {
     }
     $dnsIp = $thisServer.ip
     $nic.DnsSettings.DnsServers.Add($dnsIp)
-    $nic | Set-AzureRmNetworkInterface | Out-Null
+    $nic | Set-AzNetworkInterface | Out-Null
     Write-Host "$_`t-> $dnsName`t$dnsIp"
   }
 } | Out-Null
