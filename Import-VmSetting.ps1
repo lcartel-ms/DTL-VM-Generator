@@ -17,8 +17,8 @@ $ErrorActionPreference = 'Stop'
 
 . "./Utils.ps1"
 
-$SourceStorageContext = New-AzureStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $StorageAccountKey
-$jsonBlobs = Get-AzureStorageBlob -Context $SourceStorageContext -Container $StorageContainerName -Blob '*json'
+$SourceStorageContext = New-AzStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $StorageAccountKey
+$jsonBlobs = Get-AzStorageBlob -Context $SourceStorageContext -Container $StorageContainerName -Blob '*json'
 Write-Host "Downloading $($jsonBlobs.Count) json files from storage account"
 
 $downloadFolder = Join-Path $env:TEMP 'CustomImageDownloads'
@@ -30,11 +30,11 @@ New-Item -Path $downloadFolder -ItemType Directory | Out-Null
 
 $sourceImageInfos = @()
 
-$jsonBlobs | Get-AzureStorageBlobContent -Destination $downloadFolder | Out-Null
+$jsonBlobs | Get-AzStorageBlobContent -Destination $downloadFolder | Out-Null
 $downloadedFileNames = Get-ChildItem -Path $downloadFolder
 foreach($file in $downloadedFileNames)
 {
-    $imageObj = (gc $file.FullName -Raw) | ConvertFrom-Json
+    $imageObj = (Get-Content $file.FullName -Raw) | ConvertFrom-Json
     $imageObj.timestamp = [DateTime]::Parse($imageObj.timestamp)
     Add-Member -InputObject $imageObj -MemberType NoteProperty -Name sourceVhdUri -Value "$($SourceStorageContext.BlobEndPoint)$StorageContainerName/$($imageObj.vhdFileName)"
     $sourceImageInfos += $imageObj
