@@ -24,15 +24,16 @@ param
     [string] $StorageAccountKey,
 
     [ValidateNotNullOrEmpty()]
-    [Parameter(Mandatory=$true, HelpMessage="The resource group name for the Shared Image Gallery, only required if the SIG doesn't already exist")]
-    [string] $SharedImageGalleryResourceGroupName,
+    [Parameter(Mandatory=$false, HelpMessage="The resource group name for the Shared Image Gallery, only required if the SIG doesn't already exist")]
+    [string] $SharedImageGalleryResourceGroupName = "SharedImageGallery_DevTestLabs",
 
     [ValidateNotNullOrEmpty()]
-    [Parameter(Mandatory=$true, HelpMessage="The Name of the Shared Image Gallery where we will publish the VHDs & JSON information")]
-    [string] $SharedImageGalleryName,
+    [Parameter(Mandatory=$false, HelpMessage="The Name of the Shared Image Gallery where we will publish the VHDs & JSON information")]
+    [string] $SharedImageGalleryName = "SharedImageGallery_DevTestLabs",
 
+    [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="The location of the Shared Image Gallery, only required if the SIG doesn't already exist")]
-    [string] $SharedImageGalleryLocation
+    [string] $SharedImageGalleryLocation = "westeurope"
 
 )
 $startTime = Get-Date
@@ -51,10 +52,7 @@ $ImagePublisher = "PeteHauge"
 
 .\Import-VHDsToSharedImageGallery.ps1 -StorageAccountName "epitacybersecurity" `
                                       -StorageContainerName "vhds" `
-                                      -StorageAccountKey "z0+62+wrBO6tBg6IvGZA20VAK6JxND3QP7YtgmlNXGVE32ysJW9aXlPFZ1hHITEvBZs6pdgHogzMRHPUSfeKRA==" `
-                                      -SharedImageGalleryResourceGroupName "EPITA-CyberSecurity" `
-                                      -SharedImageGalleryName "CyberSecurityImageGallery" `
-                                      -SharedImageGalleryLocation "westeurope" 
+                                      -StorageAccountKey "z0+62+wrBO6tBg6IvGZA20VAK6JxND3QP7YtgmlNXGVE32ysJW9aXlPFZ1hHITEvBZs6pdgHogzMRHPUSfeKRA=="
 }
 # --------------------------------------------
 
@@ -63,9 +61,22 @@ $ErrorActionPreference = 'Stop'
 . "./Utils.ps1"
 
 $importVhdToSharedImageGalleryScriptBlock = {
-    Param($SharedImageGallery, $ImageDefinitions, $imageInfo)
+    param
+    (
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory=$true, HelpMessage="The Shared Image Gallery object")]
+        [psobject] $SharedImageGallery,
+    
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory=$true, HelpMessage="All the image definitions in the Shared Image Gallery")]
+        [psobject] $ImageDefinitions,
+    
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory=$true, HelpMessage="The details of the VHD to import into the Shared Image Gallery")]
+        [string] $imageInfo
+    )
 
-        # See if we have an existing image
+    # See if we have an existing image
     $imageDef = $ImageDefinitions | Where-Object {$_.Name -eq $imageInfo.imageName}
     Write-Output "Begin import of image '$($imageInfo.imageName)'"
     if (-not $imageDef) {
@@ -140,6 +151,10 @@ if (-not $SharedImageGallery) {
 
 # List of image definitions in the shared image gallery
 $ImageDefinitions = Get-AzGalleryImageDefinition -GalleryName $SharedImageGallery.Name -ResourceGroupName $SharedImageGallery.ResourceGroupName
+if (-not $ImageDefinitions) {
+    # If the image definitions variable is null, we need to make it an empty list
+    $ImageDefinitions = @()
+}
 
 # Get the list of JSON files in the storage account
 $VmSettings = & "./Import-VmSetting" -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
