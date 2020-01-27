@@ -73,7 +73,7 @@ $importVhdToSharedImageGalleryScriptBlock = {
     
         [ValidateNotNullOrEmpty()]
         [Parameter(Mandatory=$true, HelpMessage="The details of the VHD to import into the Shared Image Gallery")]
-        [string] $imageInfo
+        [psobject] $imageInfo
     )
 
     # See if we have an existing image
