@@ -36,6 +36,7 @@ foreach($file in $downloadedFileNames)
 {
     $imageObj = (Get-Content $file.FullName -Raw) | ConvertFrom-Json
     $imageObj.timestamp = [DateTime]::Parse($imageObj.timestamp)
+    Add-Member -InputObject $imageObj -MemberType NoteProperty -Name sourceVhdUri -Value "$($SourceStorageContext.BlobEndPoint)$StorageContainerName/$($imageObj.vhdFileName)"
     $sourceImageInfos += $imageObj
 }
 
