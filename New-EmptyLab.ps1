@@ -9,6 +9,10 @@ param
     [string] $ResourceGroupName,
 
     [ValidateNotNullOrEmpty()]
+    [Parameter(Mandatory=$true, HelpMessage="The Name of the Shared Image Gallery to add to the lab")]
+    [string] $SharedImageGalleryName,
+
+    [ValidateNotNullOrEmpty()]
     [Parameter(HelpMessage="The time (relative to timeZoneId) at which the Lab VMs will be automatically shutdown (E.g. 17:30, 20:00, 09:00)")]
     [string] $ShutDownTime = "1900",
 
@@ -49,6 +53,12 @@ if ($null -ne $existingLab) {
     throw "'$DevTestLabName' Lab already exists, can't create this one!  Unable to proceed."
 }
 else {
+
+    $SharedImageGallery = Get-AzGallery -Name $SharedImageGalleryName
+    if (-not $SharedImageGallery) {
+        Throw "Unable to create lab, '$SharedImageGalleryName' shared image gallery does not exist."
+    }
+
     Write-Host "Creating lab '$DevTestLabName'"
 
     # The SilentlyContinue bit is to suppress the error that otherwise this generates.
@@ -63,7 +73,8 @@ else {
 
     # Use new DTL Library here
     New-AzDtlLab -Name $DevTestLabName -ResourceGroupName $ResourceGroupName `
-        | Set-AzDtlLabShutdown -ShutdownTime $ShutDownTime -TimeZoneId $TimeZoneId
+        | Set-AzDtlLabShutdown -ShutdownTime $ShutDownTime -TimeZoneId $TimeZoneId `
+        | Set-AzDtlLabSharedImageGallery -Name "SharedImageGallery" -ResourceId $SharedImageGallery.Id
     
     Set-LabAccessControl $DevTestLabName $ResourceGroupName $CustomRole $LabOwners $LabUsers
 
