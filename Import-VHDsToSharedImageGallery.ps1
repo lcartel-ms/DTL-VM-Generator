@@ -25,7 +25,7 @@ param
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="The resource group name for the Shared Image Gallery, only required if the SIG doesn't already exist")]
-    [string] $SharedImageGalleryResourceGroupName = "SharedImageGallery_DevTestLabs",
+    [string] $SharedImageGalleryResourceGroupName = "SharedImageGallery_DevTestLabs_rg",
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="The Name of the Shared Image Gallery where we will publish the VHDs & JSON information")]
@@ -50,9 +50,9 @@ $SharedImageGalleryName = "CyberSecurityImageGallery"
 $SharedImageGalleryLocation = "westeurope"
 $ImagePublisher = "PeteHauge"
 
-.\Import-VHDsToSharedImageGallery.ps1 -StorageAccountName "epitacybersecurity" `
+.\Import-VHDsToSharedImageGallery.ps1 -StorageAccountName "epitavhds" `
                                       -StorageContainerName "vhds" `
-                                      -StorageAccountKey "z0+62+wrBO6tBg6IvGZA20VAK6JxND3QP7YtgmlNXGVE32ysJW9aXlPFZ1hHITEvBZs6pdgHogzMRHPUSfeKRA=="
+                                      -StorageAccountKey "vjl59kvYByxPgl8+euRkDiAvm1096VEsUv1PoVklMDTz4mEWpxR9P0txLbj7daFBuzd9RAqCDbrxDXrSyXwVhA=="
 }
 # --------------------------------------------
 
@@ -90,7 +90,7 @@ $importVhdToSharedImageGalleryScriptBlock = {
                                                  -Publisher 'Custom' `
                                                  -Offer $imageInfo.imageName `
                                                  -Sku $imageInfo.vhdFileName `
-                                                 -OsState Generalized `
+                                                 -OsState Specialized `
                                                  -OsType $imageInfo.osType
     }
 
@@ -101,7 +101,7 @@ $importVhdToSharedImageGalleryScriptBlock = {
                               | Remove-AzGalleryImageVersion -Force | Out-Null
 
     $imageConfig = New-AzImageConfig -Location $SharedImageGallery.Location
-    $imageConfig = Set-AzImageOsDisk -Image $imageConfig -OsType Windows -OsState Generalized -BlobUri $imageinfo.sourceVhdUri
+    $imageConfig = Set-AzImageOsDisk -Image $imageConfig -OsType Windows -OsState Specialized -BlobUri $imageinfo.sourceVhdUri
     Write-Output "   Importing VHD '$($imageInfo.vhdFileName)' as a Managed Image.."
     $managedimage = New-AzImage -ImageName $imageInfo.imageName -ResourceGroupName $SharedImageGallery.ResourceGroupName -Image $imageConfig
 
