@@ -125,10 +125,10 @@ $importVhdToSharedImageGalleryScriptBlock = {
     Write-Output "   Creating a new image version for '$($imageInfo.imageName)'"
 
     # Convert the properties to a hashtable so we can apply as tags
-    $tagDetails = $imageInfo.psobject.properties | ForEach-Object { '"' + $_.Name + '" : "' + $_.Value.ToString() + '",' } | Out-String
+    $tagDetails = $imageInfo.psobject.properties | Foreach { '"' + $_.Name + '" : "' + $_.Value.ToString() + '",' } | Out-String
     while ($tagDetails.Length -gt 0 -and $tagDetails.Trim().EndsWith(",")) {
         # If we have tags, we need to remove the last comma
-        $tagDetails = $tagDetails -replace ".$"
+        $tagDetails = $tagDetails -replace “.$”
     }
 
 
@@ -184,7 +184,7 @@ $importVhdToSharedImageGalleryScriptBlock = {
    
     # Delete the managed image (we don't need it anymore), just a step to get into shared image gallery
     Write-Output "   Cleaning up managed image from '$($imageInfo.vhdFileName)'"
-    Remove-AzResource -ResourceId $managedimage.Id -Force | Out-Null
+    Remove-AzResource -ResourceId $snapshot.Id -Force | Out-Null
     Write-Output "Complete import of image '$($imageInfo.imageName)'"
 
 }
