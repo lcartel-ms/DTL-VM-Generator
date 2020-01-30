@@ -83,7 +83,7 @@ $importVhdToSharedImageGalleryScriptBlock = {
 
         [ValidateNotNullOrEmpty()]
         [Parameter(Mandatory=$true, HelpMessage="The resource ID of the storage account where VHDs are stored")]
-        [psobject] $StorageAccountResourceId
+        [string] $StorageAccountResourceId
 
     )
 
@@ -128,7 +128,7 @@ $importVhdToSharedImageGalleryScriptBlock = {
     $tagDetails = $imageInfo.psobject.properties | Foreach { '"' + $_.Name + '" : "' + $_.Value.ToString() + '",' } | Out-String
     while ($tagDetails.Length -gt 0 -and $tagDetails.Trim().EndsWith(",")) {
         # If we have tags, we need to remove the last comma
-        $tagDetails = $tagDetails -replace “.$”
+        $tagDetails = $tagDetails -replace ï¿½.$ï¿½
     }
 
 
@@ -178,9 +178,9 @@ $importVhdToSharedImageGalleryScriptBlock = {
     $tmp = New-TemporaryFile
     Set-Content -Path $tmp.FullName -Value $templateImageVersion
 
-    $imageVersion = New-AzureRmResourceGroupDeployment -Name "$($imageDef.Name)-$(Get-Random))" `
-                                                       -ResourceGroupName $SharedImageGallery.ResourceGroupName `
-                                                       -TemplateFile $tmp.FullName
+    $imageVersion = New-AzResourceGroupDeployment -Name "$($imageDef.Name)-$(Get-Random)" `
+                                                  -ResourceGroupName $SharedImageGallery.ResourceGroupName `
+                                                  -TemplateFile $tmp.FullName
    
     # Delete the managed image (we don't need it anymore), just a step to get into shared image gallery
     Write-Output "   Cleaning up managed image from '$($imageInfo.vhdFileName)'"
@@ -240,6 +240,10 @@ while ($runningJobs -gt 0){
     foreach ($job in Get-RsJob -State Completed) {
         Write-Output "----------------------------------------------"
         $job.Output | Write-Output
+
+        if ($job.HasErrors) {
+            $job.Error | Write-Output
+        }
         
         Remove-RSJob -Job $job
     }
