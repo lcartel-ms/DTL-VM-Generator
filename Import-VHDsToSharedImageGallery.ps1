@@ -24,6 +24,10 @@ param
     [string] $StorageAccountKey,
 
     [ValidateNotNullOrEmpty()]
+    [Parameter(Mandatory=$true, HelpMessage="The resource ID for the storage account where custom images are stored")]
+    [string] $StorageAccountResourceId,
+
+    [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="The resource group name for the Shared Image Gallery, only required if the SIG doesn't already exist")]
     [string] $SharedImageGalleryResourceGroupName = "SharedImageGallery_DevTestLabs_rg",
 
@@ -42,23 +46,25 @@ Write-Output "Start of script: $StartTime"
 
 # ------------- DEBUGGING VALUES -------------
 if ($false) {
-$StorageAccountName = "epitacybersecurity"
+$StorageAccountName = "epitavhds"
 $StorageContainerName = "vhds"
-$StorageAccountKey = "z0+62+wrBO6tBg6IvGZA20VAK6JxND3QP7YtgmlNXGVE32ysJW9aXlPFZ1hHITEvBZs6pdgHogzMRHPUSfeKRA=="
-$SharedImageGalleryResourceGroupName = "EPITA-CyberSecurity"
-$SharedImageGalleryName = "CyberSecurityImageGallery"
+$StorageAccountKey = "vjl59kvYByxPgl8+euRkDiAvm1096VEsUv1PoVklMDTz4mEWpxR9P0txLbj7daFBuzd9RAqCDbrxDXrSyXwVhA=="
+$SharedImageGalleryResourceGroupName = "EPITA_SIG_rg"
+$SharedImageGalleryName = "EPITA_SIG"
 $SharedImageGalleryLocation = "westeurope"
-$ImagePublisher = "PeteHauge"
+$StorageAccountResourceId = "/subscriptions/39df6a21-006d-4800-a958-2280925030cb/resourceGroups/SharedImageGallery_DevTestLabs_rg/providers/Microsoft.Storage/storageAccounts/epitavhds"
 
 .\Import-VHDsToSharedImageGallery.ps1 -StorageAccountName "epitavhds" `
                                       -StorageContainerName "vhds" `
-                                      -StorageAccountKey "vjl59kvYByxPgl8+euRkDiAvm1096VEsUv1PoVklMDTz4mEWpxR9P0txLbj7daFBuzd9RAqCDbrxDXrSyXwVhA=="
+                                      -StorageAccountKey "vjl59kvYByxPgl8+euRkDiAvm1096VEsUv1PoVklMDTz4mEWpxR9P0txLbj7daFBuzd9RAqCDbrxDXrSyXwVhA==" `
+                                      -StorageAccountResourceId "/subscriptions/39df6a21-006d-4800-a958-2280925030cb/resourceGroups/SharedImageGallery_DevTestLabs_rg/providers/Microsoft.Storage/storageAccounts/epitavhds"
 }
 # --------------------------------------------
 
 $ErrorActionPreference = 'Stop'
 
 . "./Utils.ps1"
+
 
 $importVhdToSharedImageGalleryScriptBlock = {
     param
@@ -74,6 +80,7 @@ $importVhdToSharedImageGalleryScriptBlock = {
         [ValidateNotNullOrEmpty()]
         [Parameter(Mandatory=$true, HelpMessage="The details of the VHD to import into the Shared Image Gallery")]
         [psobject] $imageInfo
+
     )
 
     # See if we have an existing image
@@ -100,31 +107,80 @@ $importVhdToSharedImageGalleryScriptBlock = {
                               -GalleryImageDefinitionName $imageDef.Name `
                               | Remove-AzGalleryImageVersion -Force | Out-Null
 
-    $imageConfig = New-AzImageConfig -Location $SharedImageGallery.Location
-    $imageConfig = Set-AzImageOsDisk -Image $imageConfig -OsType Windows -OsState Specialized -BlobUri $imageinfo.sourceVhdUri
-    Write-Output "   Importing VHD '$($imageInfo.vhdFileName)' as a Managed Image.."
-    $managedimage = New-AzImage -ImageName $imageInfo.imageName -ResourceGroupName $SharedImageGallery.ResourceGroupName -Image $imageConfig
+    $snapshotConfig = New-AzSnapshotConfig -AccountType "Standard_LRS" `
+                                           -Location $SharedImageGallery.Location `
+                                           -CreateOption Import `
+                                           -OsType $imageInfo.osType `
+                                           -SourceUri $imageinfo.sourceVhdUri `
+                                           -StorageAccountId $StorageAccountResourceId
+                                            
+
+    Write-Output "   Importing VHD '$($imageInfo.vhdFileName)' as a snapshot..."
+    $snapshot = New-AzSnapshot -Snapshot $snapshotConfig -ResourceGroupName $SharedImageGallery.ResourceGroupName -SnapshotName $imageInfo.imageName
 
     Write-Output "   Creating a new image version for '$($imageInfo.imageName)'"
 
     # Convert the properties to a hashtable so we can apply as tags
-    $tags = @{}
-    $imageInfo.psobject.properties | Foreach { $tags[$_.Name] = $_.Value.ToString() }
+    $tags = @"
+    {
+        $($imageInfo.psobject.properties | Foreach { '"' + $_.Name + '" : "' + $_.Value.ToString() + '"' } | Out-String)
+    }
+"@
+
 
     # Let's create a new image version based on the existing image definition & upload the VHD
-    $imageVersion = New-AzGalleryImageVersion -GalleryImageDefinitionName $imageDef.Name `
-                                              -GalleryImageVersionName '1.0.0' `
-                                              -GalleryName $SharedImageGallery.Name `
-                                              -ResourceGroupName  $SharedImageGallery.ResourceGroupName `
-                                              -Location $SharedImageGallery.Location `
-                                              -TargetRegion @(@{Name=$SharedImageGallery.Location;ReplicaCount=1})  `
-                                              -Source $managedimage.Id `
-                                              -Tag $tags
-    
+    # NOTE: we have no powershell support for this, so we have to do it by deploying a template
+
+    $templateImageVersion = @"
+{
+    "`$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "resources": [
+        {
+            "apiVersion": "2019-07-01",
+            "type": "Microsoft.Compute/galleries/images/versions",
+            "name": "$($SharedImageGallery.Name)/$($imageDef.Name)/1.0.0",
+            "location": "$($SharedImageGallery.Location)",
+            "properties": {
+                "publishingProfile": {
+                    "replicaCount": "1",
+                    "targetRegions": [
+                        {
+                            "name": "$($SharedImageGallery.Location)",
+                            "regionalReplicaCount": 1,
+                            "storageAccountType": "Standard_LRS"
+                        }
+                    ],
+                    "excludeFromLatest": "false"
+                },
+                "storageProfile": {
+                    "osDiskImage": {
+                        "hostCaching": "None",
+                        "source": {
+                            "id": "$($snapshot.Id)"
+                        }
+                    }
+                }
+            },
+            "tags": $tags
+        }
+    ],
+    "outputs": {}
+}
+"@
+
+    $tmp = New-TemporaryFile
+    Set-Content -Path $tmp.FullName -Value $templateImageVersion
+
+    $imageVersion = New-AzureRmResourceGroupDeployment -Name "$($imageDef.Name)-$(Get-Random))" `
+                                                       -ResourceGroupName $SharedImageGallery.ResourceGroupName `
+                                                       -TemplateFile $tmp.FullName
+   
     # Delete the managed image (we don't need it anymore), just a step to get into shared image gallery
     Write-Output "   Cleaning up managed image from '$($imageInfo.vhdFileName)'"
     Remove-AzResource -ResourceId $managedimage.Id -Force | Out-Null
     Write-Output "Complete import of image '$($imageInfo.imageName)'"
+
 }
 
 # Check if the shared image gallery exists, if not we create it

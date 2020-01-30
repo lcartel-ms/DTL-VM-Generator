@@ -6,6 +6,10 @@ param
     [Parameter(Mandatory=$true, HelpMessage="The Name of the resource group")]
     [string] $ResourceGroupName,
 
+    [ValidateNotNullOrEmpty()]
+    [Parameter(Mandatory=$true, HelpMessage="The Name of the Shared Image Gallery attached to the lab")]
+    [string] $SharedImageGalleryName,
+
     [ValidateSet("Delete","Leave","Error")]
     [Parameter(Mandatory=$true, HelpMessage="What to do if a VM with the same name exist in the lab (Delete, Leave, Error)")]
     [string] $IfExist,
@@ -19,7 +23,7 @@ $ErrorActionPreference = 'Stop'
 . "./Utils.ps1"
 
 if(-not $VmSettings) {
-  $VmSettings = & "./Import-VmSetting" -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
+    $VmSettings = & "./Import-VmSetting" -SharedImageGalleryName $SharedImageGalleryName
 }
 
 if(-not $VmSettings) {
@@ -42,13 +46,16 @@ $jobs = @()
 
 foreach($descr in $VmSettings) {
 
-  $imageName = $DevTestLabName + $descr.imageName
   $vmName = $descr.imageName
 
   Write-Host "Starting job to create a VM named $vmName"
 
-  $jobs += $lab | New-AzDtlVm -VmName $vmName -Size $descr.size -StorageType $descr.storageType -CustomImage $imageName -Notes $descr.description `
-          -AsJob
+  $jobs += $lab | New-AzDtlVm -VmName $vmName `
+                              -Size $descr.size `
+                              -StorageType $descr.storageType `
+                              -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
+                              -Notes $descr.description `
+                              -AsJob
 
   Start-Sleep -Seconds 60
 }
