@@ -48,16 +48,16 @@ Write-Output "Start of script: $StartTime"
 if ($false) {
 $StorageAccountName = "epitavhds"
 $StorageContainerName = "vhds"
-$StorageAccountKey = "vjl59kvYByxPgl8+euRkDiAvm1096VEsUv1PoVklMDTz4mEWpxR9P0txLbj7daFBuzd9RAqCDbrxDXrSyXwVhA=="
-$SharedImageGalleryResourceGroupName = "EPITA_SIG_rg"
-$SharedImageGalleryName = "EPITA_SIG"
+$StorageAccountKey = "sATBsMPwuigEP4ALyJYPdX8E5KkGa/KyyMKsiLN8eBb5xPhUHOq3YJKOg9pmTQfC9P0BuoAmn324q7VcUBzPAA=="
+$SharedImageGalleryResourceGroupName = "SharedImageGallery_DevTestLabs_rg"
+$SharedImageGalleryName = "SharedImageGallery_DevTestLabs"
 $SharedImageGalleryLocation = "westeurope"
-$StorageAccountResourceId = "/subscriptions/39df6a21-006d-4800-a958-2280925030cb/resourceGroups/SharedImageGallery_DevTestLabs_rg/providers/Microsoft.Storage/storageAccounts/epitavhds"
+$StorageAccountResourceId = "/subscriptions/39df6a21-006d-4800-a958-2280925030cb/resourceGroups/EPITA-VHDs_rg/providers/Microsoft.Storage/storageAccounts/epitavhds"
 
 .\Import-VHDsToSharedImageGallery.ps1 -StorageAccountName "epitavhds" `
                                       -StorageContainerName "vhds" `
-                                      -StorageAccountKey "vjl59kvYByxPgl8+euRkDiAvm1096VEsUv1PoVklMDTz4mEWpxR9P0txLbj7daFBuzd9RAqCDbrxDXrSyXwVhA==" `
-                                      -StorageAccountResourceId "/subscriptions/39df6a21-006d-4800-a958-2280925030cb/resourceGroups/SharedImageGallery_DevTestLabs_rg/providers/Microsoft.Storage/storageAccounts/epitavhds"
+                                      -StorageAccountKey "sATBsMPwuigEP4ALyJYPdX8E5KkGa/KyyMKsiLN8eBb5xPhUHOq3YJKOg9pmTQfC9P0BuoAmn324q7VcUBzPAA==" `
+                                      -StorageAccountResourceId "/subscriptions/39df6a21-006d-4800-a958-2280925030cb/resourceGroups/EPITA-VHDs_rg/providers/Microsoft.Storage/storageAccounts/epitavhds"
 }
 # --------------------------------------------
 
@@ -79,7 +79,11 @@ $importVhdToSharedImageGalleryScriptBlock = {
     
         [ValidateNotNullOrEmpty()]
         [Parameter(Mandatory=$true, HelpMessage="The details of the VHD to import into the Shared Image Gallery")]
-        [psobject] $imageInfo
+        [psobject] $imageInfo,
+
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory=$true, HelpMessage="The resource ID of the storage account where VHDs are stored")]
+        [psobject] $StorageAccountResourceId
 
     )
 
@@ -121,11 +125,11 @@ $importVhdToSharedImageGalleryScriptBlock = {
     Write-Output "   Creating a new image version for '$($imageInfo.imageName)'"
 
     # Convert the properties to a hashtable so we can apply as tags
-    $tags = @"
-    {
-        $($imageInfo.psobject.properties | Foreach { '"' + $_.Name + '" : "' + $_.Value.ToString() + '"' } | Out-String)
+    $tagDetails = $imageInfo.psobject.properties | ForEach-Object { '"' + $_.Name + '" : "' + $_.Value.ToString() + '",' } | Out-String
+    while ($tagDetails.Length -gt 0 -and $tagDetails.Trim().EndsWith(",")) {
+        # If we have tags, we need to remove the last comma
+        $tagDetails = $tagDetails -replace ".$"
     }
-"@
 
 
     # Let's create a new image version based on the existing image definition & upload the VHD
@@ -162,7 +166,9 @@ $importVhdToSharedImageGalleryScriptBlock = {
                     }
                 }
             },
-            "tags": $tags
+            "tags": {
+                $tagDetails
+            }
         }
     ],
     "outputs": {}
@@ -220,7 +226,7 @@ $jobs = @()
 # For each JSON file, we create a image (if there isn't one already), or add a new image version
 foreach ($imageInfo in $VmSettings) {
     Write-Output "Starting job to import $($imageInfo.imageName) image"
-    $jobs += Start-RSJob -ScriptBlock $importVhdToSharedImageGalleryScriptBlock -ArgumentList $SharedImageGallery, $ImageDefinitions, $imageInfo -Throttle 25
+    $jobs += Start-RSJob -ScriptBlock $importVhdToSharedImageGalleryScriptBlock -ArgumentList $SharedImageGallery, $ImageDefinitions, $imageInfo, $StorageAccountResourceId -Throttle 25
     Start-Sleep -Seconds 15
 }
 
