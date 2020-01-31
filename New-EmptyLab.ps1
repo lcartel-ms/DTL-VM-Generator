@@ -74,7 +74,7 @@ else {
     # Use new DTL Library here
     New-AzDtlLab -Name $DevTestLabName -ResourceGroupName $ResourceGroupName `
         | Set-AzDtlLabShutdown -ShutdownTime $ShutDownTime -TimeZoneId $TimeZoneId `
-        | Set-AzDtlLabSharedImageGallery -Name "SharedImageGallery" -ResourceId $SharedImageGallery.Id
+        | Set-AzDtlLabSharedImageGallery -Name $SharedImageGalleryName -ResourceId $SharedImageGallery.Id
     
     Set-LabAccessControl $DevTestLabName $ResourceGroupName $CustomRole $LabOwners $LabUsers
 
