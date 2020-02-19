@@ -203,7 +203,7 @@ function Wait-JobWithProgress {
   $output = $jobs | Receive-Job -ErrorAction Continue
 
   # If the output has resource types, format it like a table, otherwise just write it out
-  if ($output -and ( [bool]($output[0].PSobject.Properties.Name -contains "ResourceType"))) {
+  if ($output -and (Get-Member -InputObject $output[0] -Name ResourceType -MemberType Properties)) {
     $output | Select-Object Name, `
                             ResourceGroupName, `
                             ResourceType, `
