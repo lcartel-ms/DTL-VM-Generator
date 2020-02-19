@@ -253,3 +253,165 @@ function Import-ConfigFile {
     $lab
   }
 }
+function Show-JobProgress {
+  [CmdletBinding()]
+  param(
+      [Parameter(Mandatory,ValueFromPipeline)]
+      [ValidateNotNullOrEmpty()]
+      [System.Management.Automation.Job[]]
+      $Job
+  )
+
+  Process {
+      $Job.ChildJobs | ForEach-Object {
+          if (-not $_.Progress) {
+              return
+          }
+
+          $_.Progress |Select-Object -Last 1 | ForEach-Object {
+              $ProgressParams = @{}
+              if ($_.Activity          -and $null -ne $_.Activity) { $ProgressParams.Add('Activity',         $_.Activity) }
+              if ($_.StatusDescription -and $null -ne $_.StatusDescription) { $ProgressParams.Add('Status',           $_.StatusDescription) }
+              if ($_.CurrentOperation  -and $null -ne $_.CurrentOperation) { $ProgressParams.Add('CurrentOperation', $_.CurrentOperation) }
+              if ($_.ActivityId        -and $_.ActivityId        -gt -1)    { $ProgressParams.Add('Id',               $_.ActivityId) }
+              if ($_.ParentActivityId  -and $_.ParentActivityId  -gt -1)    { $ProgressParams.Add('ParentId',         $_.ParentActivityId) }
+              if ($_.PercentComplete   -and $_.PercentComplete   -gt -1)    { $ProgressParams.Add('PercentComplete',  $_.PercentComplete) }
+              if ($_.SecondsRemaining  -and $_.SecondsRemaining  -gt -1)    { $ProgressParams.Add('SecondsRemaining', $_.SecondsRemaining) }
+
+              Write-Progress @ProgressParams
+          }
+      }
+  }
+}
+
+function Wait-RSJobWithProgress {
+  param(
+    [ValidateNotNullOrEmpty()]
+    $jobs,
+
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    $secTimeout
+    )
+
+  Write-Host "Waiting for results at most $secTimeout seconds, or $( [math]::Round($secTimeout / 60,1)) minutes, or $( [math]::Round($secTimeout / 60 / 60,1)) hours ..."
+
+  if(-not $jobs) {
+    Write-Host "No jobs to wait for"
+    return
+  }
+
+  $timer = [Diagnostics.Stopwatch]::StartNew()
+
+  $jobs | Wait-RSJob -ShowProgress -Timeout $secTimeout | Out-Null
+
+  $timer.Stop()
+  $lasted = $timer.Elapsed.TotalSeconds
+
+  Write-Host ""
+  Write-Host "JOBS STATUS"
+  Write-Host "-------------------"
+  $jobs | Format-Table | Out-Host
+
+  $allJobs = $jobs | Select-Object -ExpandProperty 'Name'
+  $failedJobs = $jobs | Where-Object {$_.State -eq 'Failed'} | Select-Object -ExpandProperty 'Name'
+  $runningJobs = $jobs | Where-Object {$_.State -eq 'Running'} | Select-Object -ExpandProperty 'Name'
+  $completedJobs = $jobs | Where-Object {$_.State -eq 'Completed'} | Select-Object -ExpandProperty 'Name'
+
+  Write-Output "OUTPUT for ($allJobs)"
+  # These go to output to show errors and correct results
+  $jobs | Receive-RSJob -ErrorAction Continue
+  $jobs | Remove-RSjob -Force | Out-Null
+
+  $errorString =  ""
+  if($failedJobs -or $runningJobs) {
+    $errorString += "Failed jobs: $failedJobs, Running jobs: $runningJobs. "
+  }
+
+  if ($lasted -gt $secTimeout) {
+    $errorString += "Jobs did not complete before timeout period. It lasted for $lasted secs."
+  }
+
+  if($errorString) {
+    throw "ERROR: $errorString"
+  }
+
+  Write-Output "These jobs ($completedJobs) completed before timeout period. They lasted for $lasted secs."
+}
+
+function Invoke-RSForEachLab {
+  param
+  (
+    [parameter(ValueFromPipeline)]
+    [string] $script,
+    [string] $ConfigFile = "config.csv",
+    [int] $SecondsBetweenLoops =  10,
+    [string] $customRole = "No VM Creation User",
+    [string] $ImagePattern = "",
+    [string] $IfExist = "Leave",
+    [int] $SecTimeout = 5 * 60 * 60,
+    [string] $MatchBy = "",
+    [string[]] $ModulesToImport
+  )
+
+  $config = Import-Csv $ConfigFile
+
+  $jobs = @()
+
+  $config | ForEach-Object {
+    $lab = $_
+    Write-Host "Starting operating on $($lab.DevTestLabName) ..."
+
+    # We are getting a string from the csv file, so we need to split it
+    if($lab.LabOwners) {
+        $ownAr = $lab.LabOwners.Split(",").Trim()
+    } else {
+        $ownAr = @()
+    }
+    if($lab.LabUsers) {
+        $userAr = $lab.LabUsers.Split(",").Trim()
+    } else {
+        $userAr = @()
+    }
+
+    # The scripts that operate over a single lab need to have an uniform number of parameters so that they can be invoked by Invoke-ForeachLab.
+    # The argumentList of star-job just allows passing arguments positionally, so it can't be used if the scripts have arguments in different positions.
+    # To workaround that, a string gets generated that embed the script as text and passes the parameters by name instead
+    # Also, a valueFromRemainingArguments=$true parameter needs to be added to the single lab script
+    # So we achieve the goal of reusing the Invoke-Foreach function for everything, while still keeping the single lab scripts clean for the caller
+    # The price we pay for the above is the crazy code below, which is likely quite bug prone ...
+    $formatOwners = $ownAr | ForEach-Object { "'$_'"}
+    $ownStr = $formatOwners -join ","
+    $formatUsers = $userAr | ForEach-Object { "'$_'"}
+    $userStr = $formatUsers -join ","
+
+    $params = "@{
+      DevTestLabName='$($lab.DevTestLabName)';
+      ResourceGroupName='$($lab.ResourceGroupName)';
+      StorageAccountName='$($lab.StorageAccountName)';
+      StorageContainerName='$($lab.StorageContainerName)';
+      StorageAccountKey='$($lab.StorageAccountKey)';
+      ShutDownTime='$($lab.ShutDownTime)';
+      TimezoneId='$($lab.TimezoneId)';
+      LabRegion='$($lab.LabRegion)';
+      LabOwners= @($ownStr);
+      LabUsers= @($userStr);
+      CustomRole='$($customRole)';
+      ImagePattern='$($ImagePattern)';
+      IfExist='$($IfExist)';
+      MatchBy='$($MatchBy)'
+    }"
+
+    $sb = [scriptblock]::create(
+    @"
+    `Set-Location `$Using:PWD
+    `$params=$params
+    .{$(get-content $script -Raw)} @params
+"@)
+
+    $jobs += Start-RSJob -Name $lab.DevTestLabName -ScriptBlock $sb -ModulesToImport $ModulesToImport
+    Start-Sleep -Seconds $SecondsBetweenLoops
+  }
+
+  Wait-RSJobWithProgress -secTimeout $secTimeout -jobs $jobs
+}
