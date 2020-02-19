@@ -1,5 +1,5 @@
 {
-    "Name": "DTL No VM Creation",
+    "Name": "No VM Creation User",
     "Id": null,
     "IsCustom": true,
     "Description": "Lets you connect, start, restart, and shutdown your virtual machines in your Azure DevTest Labs. You cannot create new VMs.",
