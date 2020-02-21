@@ -26,6 +26,7 @@ if($justAzureRm) {
     Write-Error "This module does not work correctly with version 5 or lower of AzureRM, please upgrade to a newer version of Azure PowerShell in order to use this module."
   } else {
     # This is not defaulted in older versions of AzureRM
+
     # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
     Save-AzContext -Path (Join-Path $env:TEMP "AzContext.json") -Force | Out-Null    # Save the context (WORKAROUND)
     Disable-AzContextAutosave -Scope Process | Out-Null
@@ -605,6 +606,106 @@ function Remove-AzDtlLab {
   end {}
 }
 
+function Add-AzDtlLabTags {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Lab object to set Shared Image Gallery")]
+    [ValidateNotNullOrEmpty()]
+    $Lab,
+
+    [parameter(Mandatory=$true,HelpMessage="The tags to set on the lab and it's associated resources")]
+    [Hashtable] $tags,
+
+    [parameter(Mandatory = $false)]
+    [switch] $AsJob
+  )
+
+  begin {. BeginPreamble}
+  process {
+    try{
+
+      $sb = {
+        param($Lab, $tags, $justAz)
+
+        function Unify-Tags {
+            [CmdletBinding()]
+            param(
+                [Parameter(Mandatory=$true)]
+                [hashtable] $destinationTagList,
+
+                [Parameter(Mandatory=$true)]
+                [hashtable] $sourceTagList
+            )
+
+            # if the destination doesn't have any tags, just apply the whole set of tags from the source
+            if ($destinationTagList -eq $null) {
+                if ($sourceTagList -ne $null) {
+                    $finalTagList = $sourceTagList.Clone()
+                }
+                else {
+                    $finalTagList = $null
+                }
+            }
+            else {
+                # The destination list has tags, let's compare each one to make sure none are missing
+                $finalTagList = $destinationTagList.Clone()
+
+                # If the source list of tags isn't null, lets merge the tags in
+                if ($sourceTagList -ne $null) {
+                    foreach ($sourceTag in $sourceTagList.GetEnumerator()) {
+                        # Does the dest contain the Tag?
+                        if ($finalTagList.Contains($sourceTag.Name)) {
+                            # If there's a tag with the same name and the value is different we should fix it
+                            if ($finalTagList[$sourceTag.Name] -ne $sourceTag.Value) {
+                                $finalTagList[$sourceTag.Name] = $sourceTag.Value
+                            }
+                        }
+                        else {
+                            # destination doesn't contain the tag, let's add it
+                            $finalTagList.Add($sourceTag.Name, $sourceTag.Value)
+                        }
+                    }
+                }
+            }
+            $finalTagList
+        }
+
+        if($justAz) {
+          Enable-AzureRmAlias -Scope Local -Verbose:$false
+
+          # WORKAROUND
+          Disable-AzContextAutosave -Scope Process | Out-Null
+          Import-AzContext -Path (Join-Path $env:TEMP "AzContext.json") | Out-Null
+        }
+
+        # Get the lab resource first
+        $labObj = Get-AzureRmResource -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs"
+
+        # Find all the resources associated with this lab (only proceed if we found the lab)
+        if ($labObj.Properties.uniqueIdentifier) {
+            Get-AzureRmResource -TagName hidden-DevTestLabs-LabUId -TagValue $labObj.Properties.uniqueIdentifier `
+                  | ForEach-Object {
+                      Set-AzureRmResource -ResourceId $_.ResourceId -Tag (Unify-Tags $_.Tags $tags) -Force
+                  }
+            # Finally, tag the lab itself
+            Set-AzureRmResource -ResourceId $labObj.ResourceId -Tag (Unify-Tags $labObj.Tags $tags) -Force
+        }
+      }
+
+      if($AsJob) {
+        Start-Job      -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz
+      } else {
+        Invoke-Command -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz
+      }
+
+    } 
+    catch {
+      Write-Error -ErrorRecord $_ -EA $callerEA
+    }
+  } 
+  end {
+  }
+}
 
 function Get-AzDtlLabSharedImageGallery {
   [CmdletBinding()]
@@ -3153,6 +3254,7 @@ function Get-AzDtlCustomImage {
 New-Alias -Name 'Dtl-NewLab'              -Value New-AzDtlLab
 New-Alias -Name 'Dtl-RemoveLab'           -Value Remove-AzDtlLab
 New-Alias -Name 'Dtl-GetLab'              -Value Get-AzDtlLab
+New-Alias -Name 'Dtl-AddLabTags'          -value Add-AzDtlLabTags
 New-Alias -Name 'Dtl-GetVm'               -Value Get-AzDtlVm
 New-Alias -Name 'Dtl-StartVm'             -Value Start-AzDtlVm
 New-Alias -Name 'Dtl-StopVm'              -Value Stop-AzDtlVm
@@ -3195,6 +3297,7 @@ New-Alias -Name 'Dtl-GetEnvironment'      -Value Get-AzDtlLabEnvironment
 Export-ModuleMember -Function New-AzDtlLab,
                               Remove-AzDtlLab,
                               Get-AzDtlLab,
+                              Add-AzDtlLabTags,
                               Get-AzDtlVm,
                               Start-AzDtlVm,
                               Stop-AzDtlVm,
