@@ -10,7 +10,10 @@ param
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="Custom Role to add users to")]
-    [string] $CustomRole =  "No VM Creation User"
+    [string] $CustomRole =  "No VM Creation User",
+
+    [Parameter(Mandatory=$false, HelpMessage="Pass in any tags to be applied like this: @{'Course'='CyberSecurity';'BillingCode'='12345'}")]
+    [Hashtable] $tags
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,27 +31,39 @@ $config | ForEach-Object {
 
     if(-not $existingRg) {
       Write-Host "Creating Resource Group '$($_.ResourceGroupName)' ..." -ForegroundColor Green
-      New-AzResourceGroup -Name $_.ResourceGroupName -Location $_.LabRegion | Out-Null
+      New-AzResourceGroup -Name $_.ResourceGroupName -Location $_.LabRegion -Tag $tags | Out-Null
     }
 }
+$configCount = ($config | Measure-Object).Count
 
 # Use new DTL Library here to create new labs
 Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Creating $($config.Count) labs..." -ForegroundColor Green
+Write-Host "Creating $configCount labs..." -ForegroundColor Green
 $labCreateJobs = $config | ForEach-Object {
                                 $_ | New-AzDtlLab -AsJob
                                 Start-Sleep -Seconds $SecondsBetweenLoop
                            }
 Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
 
+
 # Update the shutdown policy on the labs
 Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Updating $($config.Count) labs with correct shutdown policy..." -ForegroundColor Green
+Write-Host "Updating $configCount labs with correct shutdown policy..." -ForegroundColor Green
 Wait-JobWithProgress -jobs ($config | Set-AzDtlLabShutdown -AsJob) -secTimeout 300
+
+
+# Tag all the labs & associated resources
+if ($tags) {
+    Write-Host "---------------------------------" -ForegroundColor Green
+    Write-Host "Tagging $configCount resources..." -ForegroundColor Green
+    $jobs = $config | Add-AzDtlLabTags -tags $tags -AsJob
+    Wait-JobWithProgress -jobs $jobs -secTimeout 600
+}
+
 
 # Add appropriate owner/user permissions for the labs
 Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Adding owners & users for $($config.Count) labs..." -ForegroundColor Green
+Write-Host "Adding owners & users for $configCount labs..." -ForegroundColor Green
 $config | ForEach-Object {
     Set-LabAccessControl $_.DevTestLabName $_.ResourceGroupName $CustomRole $_.LabOwners $_.LabUsers
 }

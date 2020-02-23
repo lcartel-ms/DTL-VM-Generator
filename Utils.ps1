@@ -171,7 +171,7 @@ function Wait-JobWithProgress {
   while(($runningJobs) -and ($timer.Elapsed.TotalSeconds -lt $secTimeout)) {
 
     $output = $runningJobs | Receive-Job -Keep -ErrorAction Continue
-    # Only output something if we have something to show
+    # Only output something if we have something new to show
     if ($output -and $output.ToString().Trim()) {
       $output | Out-String | Write-Host
     }

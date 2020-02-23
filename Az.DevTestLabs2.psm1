@@ -631,9 +631,11 @@ function Add-AzDtlLabTags {
             [CmdletBinding()]
             param(
                 [Parameter(Mandatory=$true)]
+                [AllowNull()]
                 [hashtable] $destinationTagList,
 
                 [Parameter(Mandatory=$true)]
+                [AllowNull()]
                 [hashtable] $sourceTagList
             )
 
@@ -680,15 +682,15 @@ function Add-AzDtlLabTags {
 
         # Get the lab resource first
         $labObj = Get-AzureRmResource -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs"
+        # Tag the lab itself
+        Set-AzureRmResource -ResourceId $labObj.ResourceId -Tag (Unify-Tags $labObj.Tags $tags) -Force | Out-Null
 
         # Find all the resources associated with this lab (only proceed if we found the lab)
         if ($labObj.Properties.uniqueIdentifier) {
             Get-AzureRmResource -TagName hidden-DevTestLabs-LabUId -TagValue $labObj.Properties.uniqueIdentifier `
                   | ForEach-Object {
-                      Set-AzureRmResource -ResourceId $_.ResourceId -Tag (Unify-Tags $_.Tags $tags) -Force
+                      Set-AzureRmResource -ResourceId $_.ResourceId -Tag (Unify-Tags $_.Tags $tags) -Force | Out-Null
                   }
-            # Finally, tag the lab itself
-            Set-AzureRmResource -ResourceId $labObj.ResourceId -Tag (Unify-Tags $labObj.Tags $tags) -Force
         }
       }
 

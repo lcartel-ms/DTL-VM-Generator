@@ -13,7 +13,7 @@ Import-AzDtlModule                                       # Import the DTL Librar
 $config = Import-ConfigFile -ConfigFile $ConfigFile      # Import all the lab settings from the config file
 
 Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Removing the following $($config.Count) labs from Azure..." -ForegroundColor Green
+Write-Host "Removing the following $(($config | Measure-Object).Count) labs from Azure..." -ForegroundColor Green
 
 $config | Select-Object DevTestLabName, ResourceGroupName | Format-Table | Out-String | Write-Host
 
