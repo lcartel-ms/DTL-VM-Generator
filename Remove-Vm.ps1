@@ -65,7 +65,7 @@ $selectedVms | ForEach-Object {
 
   $sb = [scriptblock]::create(
     @"
-    Remove-AzDtlVm -Vm $_
+    Remove-AzResource -ResourceId $($_.ResourceId) -Force
 "@)
 
   $jobs += Start-RSJob -ScriptBlock $sb -Name $_.Name -ModulesToImport $AzDtlModulePath

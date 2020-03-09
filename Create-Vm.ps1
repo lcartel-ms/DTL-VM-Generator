@@ -49,7 +49,7 @@ $selected = Select-VmSettings -sourceImageInfos $VmSettings -ImagePattern $Image
 
 Write-Host "Settings selected ... $selected"
 
-$toCreate = ManageExistingVM $DevTestLabName $selected $IfExist
+$toCreate = ManageExistingVM $ResourceGroupName $DevTestLabName $selected $IfExist
 
 if(-not $toCreate) {
   return "No Vms to create for $DevTestLabName with the pattern $ImagePattern and IfExist as $IfExist"

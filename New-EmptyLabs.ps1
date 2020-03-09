@@ -10,10 +10,8 @@ param
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="Custom Role to add users to")]
-    [string] $CustomRole =  "No VM Creation User",
+    [string] $CustomRole =  "No VM Creation User"
 
-    [Parameter(Mandatory=$false, HelpMessage="Pass in any tags to be applied like this: @{'Course'='CyberSecurity';'BillingCode'='12345'}")]
-    [Hashtable] $tags
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,7 +29,7 @@ $config | ForEach-Object {
 
     if(-not $existingRg) {
       Write-Host "Creating Resource Group '$($_.ResourceGroupName)' ..." -ForegroundColor Green
-      New-AzResourceGroup -Name $_.ResourceGroupName -Location $_.LabRegion -Tag $tags | Out-Null
+      New-AzResourceGroup -Name $_.ResourceGroupName -Location $_.LabRegion | Out-Null
     }
 }
 $configCount = ($config | Measure-Object).Count
@@ -50,15 +48,6 @@ Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
 Write-Host "---------------------------------" -ForegroundColor Green
 Write-Host "Updating $configCount labs with correct shutdown policy..." -ForegroundColor Green
 Wait-JobWithProgress -jobs ($config | Set-AzDtlLabShutdown -AsJob) -secTimeout 300
-
-
-# Tag all the labs & associated resources
-if ($tags) {
-    Write-Host "---------------------------------" -ForegroundColor Green
-    Write-Host "Tagging $configCount resources..." -ForegroundColor Green
-    $jobs = $config | Add-AzDtlLabTags -tags $tags -AsJob
-    Wait-JobWithProgress -jobs $jobs -secTimeout 600
-}
 
 
 # Add appropriate owner/user permissions for the labs

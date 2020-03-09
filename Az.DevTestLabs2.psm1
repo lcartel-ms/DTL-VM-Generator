@@ -613,8 +613,11 @@ function Add-AzDtlLabTags {
     [ValidateNotNullOrEmpty()]
     $Lab,
 
-    [parameter(Mandatory=$true,HelpMessage="The tags to set on the lab and it's associated resources")]
+    [parameter(Mandatory=$true,HelpMessage="The tags to set on the lab and it's associated resources like this: @{'ProjectCode'='123456';'BillingCode'='654321'}")]
     [Hashtable] $tags,
+
+    [Parameter(Mandatory=$false, HelpMessage="Also tag the lab's resource group?")]
+    [bool] $tagLabsResourceGroup,
 
     [parameter(Mandatory = $false)]
     [switch] $AsJob
@@ -680,16 +683,49 @@ function Add-AzDtlLabTags {
           Import-AzContext -Path (Join-Path $env:TEMP "AzContext.json") | Out-Null
         }
 
-        # Get the lab resource first
+        if ($tagLabsResourceGroup) {
+            $labrg = Get-AzureRmResourceGroup -Name $Lab.ResourceGroupName
+            Set-AzureRmResourceGroup -Name $lab.ResourceGroupName -Tag (Unify-Tags $labrg.Tags $tags) | Out-Null
+        }
+
+        # Get the lab resource and tag it
         $labObj = Get-AzureRmResource -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs"
-        # Tag the lab itself
         Set-AzureRmResource -ResourceId $labObj.ResourceId -Tag (Unify-Tags $labObj.Tags $tags) -Force | Out-Null
+
+        # Get the DTL VMs and tag them
+        Get-AzureRmResource -ResourceGroupName $Lab.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs/VirtualMachines" | Where-Object {
+            $_.Name.StartsWith($Lab.Name + "/")
+        } | ForEach-Object {
+            Set-AzureRmResource -ResourceId $_.ResourceId -Tag (Unify-Tags $_.Tags $tags) -FOrce | Out-Null
+        }
 
         # Find all the resources associated with this lab (only proceed if we found the lab)
         if ($labObj.Properties.uniqueIdentifier) {
             Get-AzureRmResource -TagName hidden-DevTestLabs-LabUId -TagValue $labObj.Properties.uniqueIdentifier `
                   | ForEach-Object {
                       Set-AzureRmResource -ResourceId $_.ResourceId -Tag (Unify-Tags $_.Tags $tags) -Force | Out-Null
+
+                      if ($_.ResourceType -eq 'Microsoft.Compute/virtualMachines') {
+                         # We need to get the disks on the VM and tag those - disks from specialized images don't have a hidden tag
+                         # But the other resources (load balancer, network interface, public IPs, etc.) are all tagged above
+                         $vm = Get-AzureRmResource -ResourceId $_.ResourceId
+
+                         # Tag the compute's resource group assuming it's not the lab's RG
+                         if ($vm.ResourceGroupName -ne $labObj.ResourceGroupName) {
+                            $vmRg = Get-AzureRmResourceGroup -Name $vm.ResourceGroupName
+                            Set-AzureRmResourceGroup -Name $vm.ResourceGroupName -Tag (Unify-Tags $vmRg.Tags $tags) | Out-Null
+                         }
+
+                         # Add tags to the OS disk (VMs should always have an OS disk
+                         $disk = Get-AzureRmResource -ResourceId $vm.Properties.storageProfile.osDisk.managedDisk.id
+                         Set-AzureRmResource -ResourceId $disk.Id -Tag (Unify-Tags $disk.Tags $tags) -Force | Out-Null
+
+                         # Add Tags to the data disks
+                         $vm.Properties.storageProfile.dataDisks | ForEach-Object {
+                            $dataDisk = Get-AzureRmResource -ResourceId $_.managedDisk.id
+                            Set-AzureRmResource -ResourceId $dataDisk.Id -Tag (Unify-Tags $dataDisk.Tags $tags) -Force | Out-Null
+                         }
+                      }
                   }
         }
       }
@@ -2193,28 +2229,18 @@ function Add-AzDtlLabArtifactRepository {
   "resources": [
     {
       "apiVersion": "2018-10-15-preview",
-      "type": "Microsoft.DevTestLab/labs",
-      "name": "[parameters('labName')]",
+      "type": "Microsoft.DevTestLab/labs/artifactSources",
+      "name": "[concat(parameters('labName'), '/', variables('artifactRepositoryName'))]",
       "location": "[resourceGroup().location]",
-      "resources": [
-        {
-          "apiVersion": "2018-10-15-preview",
-          "name": "[variables('artifactRepositoryName')]",
-          "type": "artifactSources",
-          "dependsOn": [
-            "[resourceId('Microsoft.DevTestLab/labs', parameters('labName'))]"
-          ],
-          "properties": {
-            "uri": "[parameters('artifactRepoUri')]",
-            "folderPath": "[parameters('artifactRepoFolder')]",
-            "branchRef": "[parameters('artifactRepoBranch')]",
-            "displayName": "[parameters('artifactRepositoryDisplayName')]",
-            "securityToken": "[parameters('artifactRepoSecurityToken')]",
-            "sourceType": "[parameters('artifactRepoType')]",
-            "status": "Enabled"
-          }
-        }
-      ]
+      "properties": {
+        "uri": "[parameters('artifactRepoUri')]",
+        "folderPath": "[parameters('artifactRepoFolder')]",
+        "branchRef": "[parameters('artifactRepoBranch')]",
+        "displayName": "[parameters('artifactRepositoryDisplayName')]",
+        "securityToken": "[parameters('artifactRepoSecurityToken')]",
+        "sourceType": "[parameters('artifactRepoType')]",
+        "status": "Enabled"
+      }
     }
   ],
   "outputs": {
@@ -2266,6 +2292,7 @@ function Set-AzDtlLabAnnouncement {
           announcementTitle = $Title
           announcementMarkdown = $AnnouncementMarkdown
           announcementExpiration = $Expiration
+          labTags = $l.Tags
         }
         Write-verbose "Set Lab Announcement with $(PrintHashtable $params)"
 
@@ -2285,6 +2312,9 @@ function Set-AzDtlLabAnnouncement {
             },
             "announcementExpiration":{
                 "type": "string"
+            },
+            "labTags": {
+                "type": "object"
             }
         },
         "resources": [
@@ -2292,6 +2322,7 @@ function Set-AzDtlLabAnnouncement {
                 "apiVersion": "2018-10-15-preview",
                 "name": "[parameters('newLabName')]",
                 "type": "Microsoft.DevTestLab/labs",
+                "tags": "[parameters('labTags')]",
                 "location": "[resourceGroup().location]",
                 "properties": {
                     "labStorageType": "Premium",
@@ -2345,6 +2376,7 @@ function Set-AzDtlLabSupport {
         $params = @{
           newLabName = $l.Name
           supportMessageMarkdown = $SupportMarkdown
+          labTags = $l.Tags
         }
         Write-verbose "Set Lab Support with $(PrintHashtable $params)"
 
@@ -2358,6 +2390,9 @@ function Set-AzDtlLabSupport {
       },
       "supportMessageMarkdown": {
           "type": "string"
+      },
+      "labTags": {
+          "type": "object"
       }
   },
   "resources": [
@@ -2365,6 +2400,7 @@ function Set-AzDtlLabSupport {
           "apiVersion": "2018-10-15-preview",
           "name": "[parameters('newLabName')]",
           "type": "Microsoft.DevTestLab/labs",
+          "tags": "[parameters('labTags')]",
           "location": "[resourceGroup().location]",
           "properties": {
               "labStorageType": "Premium",
@@ -2420,6 +2456,7 @@ function Set-AzDtlLabRdpSettings {
           newLabName = $l.Name
           experienceLevel = $ExperienceLevel
           gatewayUrl = $GatewayUrl
+          labTags = $l.Tags
         }
         Write-verbose "Set Rdp Settings with $(PrintHashtable $params)"
 @"
@@ -2440,6 +2477,9 @@ function Set-AzDtlLabRdpSettings {
     },
     "gatewayUrl": {
       "type": "string"
+    },
+    "labTags": {
+      "type": "object"
     }
   },
   "resources": [
@@ -2447,6 +2487,7 @@ function Set-AzDtlLabRdpSettings {
       "apiVersion": "2018-10-15-preview",
       "type": "Microsoft.DevTestLab/labs",
       "name": "[parameters('newLabName')]",
+      "tags": "[parameters('labTags')]",
       "location": "[resourceGroup().location]",
       "properties":{
         "extendedProperties":{
@@ -2562,49 +2603,34 @@ function Set-AzDtlLabShutdown {
   "resources": [
     {
       "apiVersion": "2018-10-15-preview",
-      "type": "Microsoft.DevTestLab/labs",
-      "name": "[trim(parameters('newLabName'))]",
-      "location": "[resourceGroup().location]",
-
-      "resources": [
-        {
-          "apiVersion": "2018-10-15-preview",
-          "name": "LabVmsShutdown",
-          "type": "schedules",
-          "dependsOn": [
-            "[resourceId('Microsoft.DevTestLab/labs', parameters('newLabName'))]"
-          ],
-          "properties": {
-            "status": "[trim(parameters('scheduleStatus'))]",
-            "taskType": "LabVmsShutdownTask",
-            "timeZoneId": "[string(parameters('timeZoneId'))]",
-            "dailyRecurrence": {
-              "time": "[string(parameters('labVmShutDownTime'))]"
-            },
-            "notificationSettings": {
-                "status": "[trim(parameters('notificationSettings'))]",
-                "timeInMinutes": "[parameters('timeInMinutes')]"
-            }
-          }
-        },
-        {
-            "apiVersion": "2018-10-15-preview",
-            "name": "AutoShutdown",
-            "type": "notificationChannels",
-            "properties": {
-                "events": [
-                    {
-                        "eventName": "Autoshutdown"
-                    }
-                ],
-                "webHookUrl": "[trim(parameters('labVmShutDownURL'))]",
-                "emailRecipient": "[trim(parameters('emailRecipient'))]"
-            },
-            "dependsOn": [
-                "[resourceId('Microsoft.DevTestLab/labs', parameters('newLabName'))]"
-            ]
-        }
-      ]
+      "type": "Microsoft.DevTestLab/labs/schedules",
+      "name": "[concat(trim(parameters('newLabName')), '/LabVmsShutdown')]",
+	  "properties": {
+		"status": "[trim(parameters('scheduleStatus'))]",
+		"taskType": "LabVmsShutdownTask",
+		"timeZoneId": "[string(parameters('timeZoneId'))]",
+		"dailyRecurrence": {
+		  "time": "[string(parameters('labVmShutDownTime'))]"
+		},
+		"notificationSettings": {
+			"status": "[trim(parameters('notificationSettings'))]",
+			"timeInMinutes": "[parameters('timeInMinutes')]"
+		}
+	  }
+    },
+	{
+      "apiVersion": "2018-10-15-preview",
+      "type": "Microsoft.DevTestLab/labs/notificationChannels",
+      "name": "[concat(trim(parameters('newLabName')), '/AutoShutdown')]",
+	  "properties": {
+		"events": [
+			{
+				"eventName": "Autoshutdown"
+			}
+		],
+		"webHookUrl": "[trim(parameters('labVmShutDownURL'))]",
+		"emailRecipient": "[trim(parameters('emailRecipient'))]"
+	  },
     }
   ],
   "outputs": {

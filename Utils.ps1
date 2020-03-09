@@ -112,13 +112,13 @@ function Select-VmSettings {
 }
 
 function ManageExistingVM {
-  param($DevTestLabName, $VmSettings, $IfExist)
+  param($ResourceGroupName, $DevTestLabName, $VmSettings, $IfExist)
 
   $newSettings = @()
 
   $VmSettings | ForEach-Object {
     $vmName = $_.imageName
-    $existingVms = Get-AzResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -Name "*$DevTestLabName*" | Where-Object { $_.Name -eq "$DevTestLabName/$vmName"}
+    $existingVms = Get-AzResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -eq "$DevTestLabName/$vmName"}
 
     if($existingVms) {
       Write-Host "Found an existing VM $vmName in $DevTestLabName"
