@@ -21,4 +21,4 @@ $ErrorActionPreference = "Stop"
 
 Import-AzDtlModule
 
-"./Create-Vm.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -CustomRole $null -ImagePattern $ImagePattern -IfExist $IfExist -ModulesToImport $AzDtlModulePath
+"./Create-Vm.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -SecTimeout (8 * 60 * 60) -CustomRole $null -ImagePattern $ImagePattern -IfExist $IfExist -ModulesToImport $AzDtlModulePath
