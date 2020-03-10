@@ -20,7 +20,7 @@ $config | Select-Object DevTestLabName, ResourceGroupName | Format-Table | Out-S
 $jobs = $config | Get-AzDtlLab | Remove-AzDtlLab -AsJob
 
 if ($jobs) {
-    Wait-JobWithProgress -jobs $jobs -secTimeout 600
+    Wait-JobWithProgress -jobs $jobs -secTimeout 1200
 }
 
 Write-Host "Completed removing labs!" -ForegroundColor Green
