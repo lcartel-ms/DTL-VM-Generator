@@ -82,9 +82,15 @@ $nicsHash.Keys | ForEach-Object {
     }
     $dnsIp = $thisServer.ip
     $nic.DnsSettings.DnsServers.Add($dnsIp)
-    $nic | Set-AzNetworkInterface | Out-Null
+    
     Write-Host "$_`t-> $dnsName`t$dnsIp"
   }
+
+  # Also add the general DNS server to enable windows update - 168.63.129.16
+  $nic.DnsSettings.DnsServers.Add("168.63.129.16")
+
+  $nic | Set-AzNetworkInterface | Out-Null
+
 } | Out-Null
 
 Write-Output "Network setted correctly for $DevTestLabName"
