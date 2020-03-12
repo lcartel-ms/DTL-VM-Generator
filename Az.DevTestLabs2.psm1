@@ -74,6 +74,22 @@ function PrintHashtable {
   return ($hash.Keys | ForEach-Object { "$_ $($hash[$_])" }) -join "|"
 }
 
+function ToArray
+{
+  begin
+  {
+    $output = @();
+  }
+  process
+  {
+    $output += $_;
+  }
+  end
+  {
+    return ,$output;
+  }
+}
+
 # Getting labs that don't exist shouldn't fail, but return empty for composibility
 # Also I am forced to do client side query because when you add -ExpandProperty to Get-AzureRmResource it disables wildcard?????
 # Also I know that treating each case separately is ugly looking, but there are various bugs that might be fixed in Get-AzureRmResource
@@ -1410,6 +1426,76 @@ function Set-AzDtlShutdownPolicy {
   end {}
 }
 
+function Set-AzDtlMandatoryArtifacts {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Lab object to set Shared Image Gallery")]
+    [ValidateNotNullOrEmpty()]
+    $Lab,
+
+    [parameter(Mandatory=$false,HelpMessage="The names of mandatory artifacts for Windows-based OS")]
+    [array] $WindowsArtifactNames,
+
+    [parameter(Mandatory=$false,HelpMessage="The names of mandatory artifacts for Linux-based OS")]
+    [array] $LinuxArtifactNames
+
+  )
+
+  begin {. BeginPreamble}
+  process {
+    try{
+
+        # NOTE: It's OK if both windows/linux artifacts are null - that means clear out both lists
+        # NOTE2: There is some code duplication, powershell mucks with parameters, didn't work when moving common code to a function
+
+        # First we need to get the current state of the lab
+        $labObj = MyGetResourceLab $Lab.Name $Lab.ResourceGroupName
+
+        # Pre-process the $WindowsArtifactNames variable
+        if ($WindowsArtifactNames) {
+            # If the user passed in a string, convert it to an array
+            if ($WindowsArtifactNames -and $WindowsArtifactNames.GetType().Name -eq "String") {
+                $WindowsArtifactNames = @($WindowsArtifactNames)
+            }
+
+            # If the user didn't pass full IDs, we need to convert them
+            for ($i = 0; $i -lt $WindowsArtifactNames.Count; $i ++) {
+                if (-not $WindowsArtifactNames[$i].contains('/')) {
+                    $WindowsArtifactNames.Item($i) = "$($labObj.ResourceId)/artifactSources/public repo/artifacts/$($WindowsArtifactNames[$i])"
+                }
+            }
+        }
+
+        $labObj.Properties.mandatoryArtifactsResourceIdsWindows = $WindowsArtifactNames
+
+        # Pre-process the $LinuxArtifactNames variable
+        if ($LinuxArtifactNames) {
+            # If the user passed in a string, convert it to an array
+            if ($LinuxArtifactNames -and $LinuxArtifactNames.GetType().Name -eq "String") {
+                $LinuxArtifactNames = @($LinuxArtifactNames)
+            }
+
+            # If the user didn't pass full IDs, we need to convert them
+            for ($i = 0; $i -lt $LinuxArtifactNames.Count; $i ++) {
+                if (-not $LinuxArtifactNames[$i].contains('/')) {
+                    $LinuxArtifactNames.Item($i) = "$($labObj.ResourceId)/artifactSources/public repo/artifacts/$($LinuxArtifactNames[$i])"
+                }
+            }
+        }
+
+        $labObj.Properties.mandatoryArtifactsResourceIdsLinux = $LinuxArtifactNames
+
+        Set-AzureRmResource -Name $labObj.Name -ResourceGroupName $labObj.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs" -Properties $labObj.Properties -ApiVersion 2018-10-15-preview -Force
+
+    } 
+    catch {
+      Write-Error -ErrorRecord $_ -EA $callerEA
+    }
+  } 
+  end {
+  }
+}
+
 function Get-AzDtlVmArtifact {
   [CmdletBinding()]
   param(
@@ -2148,31 +2234,31 @@ function Add-AzDtlLabUser {
 function Add-AzDtlLabArtifactRepository {
   [CmdletBinding()]
   param(
-    [parameter(Mandatory=$true, ValueFromPipeline = $true, HelpMessage="Lab to add announcement to.")]
+    [parameter(Mandatory=$true, ValueFromPipeline = $true, HelpMessage="Lab to add artifact repository to.")]
     [ValidateNotNullOrEmpty()]
     $Lab,
 
-    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Title of announcement.")]
+    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Artifact repository display name.")]
     [ValidateNotNullOrEmpty()]
     [string] $ArtifactRepositoryDisplayName = "Team Repository",
 
-    [parameter(Mandatory=$true, ValueFromPipelineByPropertyName = $true, HelpMessage="Markdown of announcement.")]
+    [parameter(Mandatory=$true, ValueFromPipelineByPropertyName = $true, HelpMessage="Artifact repo URI.")]
     [ValidateNotNullOrEmpty()]
     [string] $ArtifactRepoUri,
 
-    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Expiration of announcement (format '2100-01-01T17:00:00+00:00').")]
+    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Branch to use for the artifact repo.")]
     [ValidateNotNullOrEmpty()]
     [string] $ArtifactRepoBranch = "master",
 
-    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Expiration of announcement (format '2100-01-01T17:00:00+00:00').")]
+    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Folder for artifacts")]
     [ValidateNotNullOrEmpty()]
     [string] $ArtifactRepoFolder = "Artifacts/",
 
-    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Expiration of announcement (format '2100-01-01T17:00:00+00:00').")]
+    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Type of artifact repo")]
     [ValidateSet("VsoGit", "GitHub")]
     [string] $ArtifactRepoType = "GitHub",
 
-    [parameter(Mandatory=$true, ValueFromPipelineByPropertyName = $true, HelpMessage="Expiration of announcement (format '2100-01-01T17:00:00+00:00').")]
+    [parameter(Mandatory=$true, ValueFromPipelineByPropertyName = $true, HelpMessage="PAT token for the artifact repo")]
     [ValidateNotNullOrEmpty()]
     [string] $ArtifactRepoSecurityToken,
 
@@ -3301,6 +3387,7 @@ New-Alias -Name 'Dtl-GetLabSchedule'      -Value Get-AzDtlLabSchedule
 New-Alias -Name 'Dtl-SetLabShutdown'      -Value Set-AzDtlLabShutdown
 New-Alias -Name 'Dtl-SetLabStartup'       -Value Set-AzDtlLabStartupSchedule
 New-Alias -Name 'Dtl-SetLabShutPolicy'    -Value Set-AzDtlShutdownPolicy
+New-Alias -Name 'Dtl-SetMandatoryArtifacts' -value Set-AzDtlMandatoryArtifacts
 New-Alias -Name 'Dtl-GetLabAllowedVmSizePolicy' -Value Get-AzDtlLabAllowedVmSizePolicy
 New-Alias -Name 'Dtl-SetLabAllowedVmSizePolicy' -Value Set-AzDtlLabAllowedVmSizePolicy
 New-Alias -Name 'Dtl-GetSharedImageGallery' -Value Get-AzDtlLabSharedImageGallery
@@ -3344,6 +3431,7 @@ Export-ModuleMember -Function New-AzDtlLab,
                               Get-AzDtlLabSchedule,
                               Set-AzDtlLabShutdown,
                               Set-AzDtlLabStartupSchedule,
+                              Set-AzDtlMandatoryArtifacts,
                               New-AzDtlLabEnvironment,
                               Get-AzDtlLabEnvironment,
                               Set-AzDtlShutdownPolicy,
