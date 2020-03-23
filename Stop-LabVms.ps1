@@ -7,11 +7,17 @@ param
   [string] $ResourceGroupName
 )
 
+$ErrorActionPreference = "Stop"
+
+# Common setup for scripts
+. "./Utils.ps1"                                          # Import all our utilities
+Import-AzDtlModule                                       # Import the DTL Library
+
 Write-Host "Stopping VMs in $DevTestLabName in RG $ResourceGroupName ..."
 Write-Host "This might take a while ..."
 
 # Get only the running VMs
-$existingLab = Get-AzDtlLab -Name $DevTestLabName  -ResourceGroupName $ResourceGroupName
+$existingLab = Get-AzDtlLab -Name $DevTestLabName -ResourceGroupName $ResourceGroupName
 
 if (-not $existingLab) {
     throw "'$DevTestLabName' doesn't exist"
@@ -25,17 +31,9 @@ if (-not $runningVms) {
 
 $jobs = @()
 $runningVms | ForEach-Object {
-
   $sb = [scriptblock]::create(
     @"
-    Stop-AzDtlVm $_
-    
-    if ($returnStatus.Status -eq 'Succeeded') {
-      Write-Output "Successfully stopped DTL machine: $dtlName"
-    }
-    else {
-      throw "Failed to stop DTL machine: $dtlName"
-    }
+    Stop-AzDtlVm -Vm $_
 "@)
 
   $jobs += Start-RSJob -ScriptBlock $sb -Name $_.Name -ModulesToImport $AzDtlModulePath
