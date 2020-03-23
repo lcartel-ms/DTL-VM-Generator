@@ -26,7 +26,8 @@ if (-not $existingLab) {
 $runningVms = Get-AzDtlVm -Lab $existingLab -Status "Running"
 
 if (-not $runningVms) {
-  throw "'$DevTestLabName' doesn't contain any VMs"
+  Write-Host "'$DevTestLabName' doesn't contain any running VMs"
+  return
 }
 
 $jobs = @()
