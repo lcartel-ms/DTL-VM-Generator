@@ -1143,15 +1143,38 @@ function Start-AzDtlVm {
   param(
     [parameter(Mandatory=$true,HelpMessage="VM to start. Noop if already started.", ValueFromPipeline=$true)]
     [ValidateNotNullOrEmpty()]
-    $Vm
+    $Vm,
+
+    [parameter(Mandatory=$false,HelpMessage="Run the command in a separate job.")]
+    [switch] $AsJob = $False
   )
 
   begin {. BeginPreamble}
   process {
     try {
+
+        $sb = {
+          param($vm, $justAz)
+
+          if($justAz) {
+            Enable-AzureRmAlias -Scope Local -Verbose:$false
+
+            # WORKAROUND
+            Disable-AzContextAutosave -Scope Process | Out-Null
+            Import-AzContext -Path (Join-Path $env:TEMP "AzContext.json") | Out-Null
+          }
+
+          Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "start" -Force | Out-Null
+          Get-AzureRmResource -ResourceId $vm.ResourceId -ExpandProperties
+        }
+
       foreach($v in $Vm) {
-        Invoke-AzureRmResourceAction -ResourceId $v.ResourceId -Action "start" -Force | Out-Null
-        $v | Get-AzDtlVm
+
+          if($AsJob.IsPresent) {
+            Start-Job      -ScriptBlock $sb -ArgumentList $v, $justAz
+          } else {
+            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $justAz
+          }
       }
     } catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
@@ -1165,15 +1188,37 @@ function Stop-AzDtlVm {
   param(
     [parameter(Mandatory=$true,HelpMessage="VM to stop. Noop if already stopped.", ValueFromPipeline=$true)]
     [ValidateNotNullOrEmpty()]
-    $Vm
+    $Vm,
+
+    [parameter(Mandatory=$false,HelpMessage="Run the command in a separate job.")]
+    [switch] $AsJob = $False
   )
 
   begin {. BeginPreamble}
   process {
     try {
+        $sb = {
+          param($vm, $justAz)
+
+          if($justAz) {
+            Enable-AzureRmAlias -Scope Local -Verbose:$false
+
+            # WORKAROUND
+            Disable-AzContextAutosave -Scope Process | Out-Null
+            Import-AzContext -Path (Join-Path $env:TEMP "AzContext.json") | Out-Null
+          }
+
+          Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "stop" -Force | Out-Null
+          Get-AzureRmResource -ResourceId $vm.ResourceId -ExpandProperties
+        }
+
       foreach($v in $Vm) {
-        Invoke-AzureRmResourceAction -ResourceId $v.ResourceId -Action "stop" -Force | Out-Null
-        $v  | Get-AzDtlVm
+
+          if($AsJob.IsPresent) {
+            Start-Job      -ScriptBlock $sb -ArgumentList $v, $justAz
+          } else {
+            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $justAz
+          }
       }
     } catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
@@ -1537,64 +1582,92 @@ function Set-AzDtlVmArtifact {
     [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true,HelpMessage="Parameters for artifact. An array of hashtable, each one as @{name = xxx; value = yyy}.")]
     [ValidateNotNullOrEmpty()]
     [array]
-    $ArtifactParameters = @()
+    $ArtifactParameters = @(),
+
+    [parameter(Mandatory=$false,HelpMessage="Run the command in a separate job.")]
+    [switch] $AsJob = $False
   )
 
   begin {. BeginPreamble}
   process {
     try {
-      foreach($v in $Vm) {
-        $ResourceGroupName = $v.ResourceGroupName
 
-        #TODO: is there a better way? It doesn't seem to be in Expanded props of VM ...
-        $LabName = $v.ResourceId.Split('/')[8]
-        if(-not $LabName) {
-          throw "VM Name for $v is not in the format 'RGName/VMName. Why?"
-        }
+        $sb = {
+            param(
+                $v,
+                [string] $RepositoryName,
+                [string] $ArtifactName,
+                [array] $ArtifactParameters = @(),
+                $justAz
+            )
 
-        # Get internal repo name
-        $repository = Get-AzureRmResource -ResourceGroupName $resourceGroupName `
-          -ResourceType 'Microsoft.DevTestLab/labs/artifactsources' `
-          -ResourceName $LabName -ApiVersion 2016-05-15 `
-          | Where-Object { $RepositoryName -in ($_.Name, $_.Properties.displayName) } `
-          | Select-Object -First 1
+            if($justAz) {
+                Enable-AzureRmAlias -Scope Local -Verbose:$false
 
-        if(-not $repository) {
-          throw "Unable to find repository $RepositoryName in lab $LabName."
-        }
-        Write-verbose "Repository found is $($repository.Name)"
-
-        # Get internal artifact name
-        $template = Get-AzureRmResource -ResourceGroupName $ResourceGroupName `
-          -ResourceType "Microsoft.DevTestLab/labs/artifactSources/artifacts" `
-          -ResourceName "$LabName/$($repository.Name)" `
-          -ApiVersion 2016-05-15 `
-          | Where-Object { $ArtifactName -in ($_.Name, $_.Properties.title) } `
-          | Select-Object -First 1
-
-        if(-not $template) {
-          throw "Unable to find template $ArtifactName in lab $LabName."
-        }
-        Write-verbose "Template artifact found is $($template.Name)"
-
-        #TODO: is there a better way to construct this?
-        $SubscriptionID = (Get-AzureRmContext).Subscription.Id
-        $FullArtifactId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.DevTestLab/labs/$LabName/artifactSources/$($repository.Name)/artifacts/$($template.Name)"
-        Write-verbose "Using artifact id $FullArtifactId"
-
-        $prop = @{
-          artifacts = @(
-            @{
-              artifactId = $FullArtifactId
-              parameters = $ArtifactParameters
+                # WORKAROUND
+                Disable-AzContextAutosave -Scope Process | Out-Null
+                Import-AzContext -Path (Join-Path $env:TEMP "AzContext.json") | Out-Null
             }
-          )
+
+            $ResourceGroupName = $v.ResourceGroupName
+
+            #TODO: is there a better way? It doesn't seem to be in Expanded props of VM ...
+            $LabName = $v.ResourceId.Split('/')[8]
+            if(-not $LabName) {
+              throw "VM Name for $v is not in the format 'RGName/VMName. Why?"
+            }
+
+            # Get internal repo name
+            $repository = Get-AzureRmResource -ResourceGroupName $resourceGroupName `
+              -ResourceType 'Microsoft.DevTestLab/labs/artifactsources' `
+              -ResourceName $LabName -ApiVersion 2016-05-15 `
+              | Where-Object { $RepositoryName -in ($_.Name, $_.Properties.displayName) } `
+              | Select-Object -First 1
+
+            if(-not $repository) {
+              throw "Unable to find repository $RepositoryName in lab $LabName."
+            }
+            Write-verbose "Repository found is $($repository.Name)"
+
+            # Get internal artifact name
+            $template = Get-AzureRmResource -ResourceGroupName $ResourceGroupName `
+              -ResourceType "Microsoft.DevTestLab/labs/artifactSources/artifacts" `
+              -ResourceName "$LabName/$($repository.Name)" `
+              -ApiVersion 2016-05-15 `
+              | Where-Object { $ArtifactName -in ($_.Name, $_.Properties.title) } `
+              | Select-Object -First 1
+
+            if(-not $template) {
+              throw "Unable to find template $ArtifactName in lab $LabName."
+            }
+            Write-verbose "Template artifact found is $($template.Name)"
+
+            #TODO: is there a better way to construct this?
+            $SubscriptionID = (Get-AzureRmContext).Subscription.Id
+            $FullArtifactId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.DevTestLab/labs/$LabName/artifactSources/$($repository.Name)/artifacts/$($template.Name)"
+            Write-verbose "Using artifact id $FullArtifactId"
+
+            $prop = @{
+              artifacts = @(
+                @{
+                  artifactId = $FullArtifactId
+                  parameters = $ArtifactParameters
+                }
+              )
+            }
+
+            Write-debug "Apply:`n $($prop | ConvertTo-Json)`n to $($v.ResourceId)."
+            Write-verbose "Using $FullArtifactId on $($v.ResourceId)"
+            Invoke-AzureRmResourceAction -Parameters $prop -ResourceId $v.ResourceId -Action "applyArtifacts" -ApiVersion 2016-05-15 -Force | Out-Null
+            Get-AzureRmResource -ResourceId $v.ResourceId -ExpandProperties
         }
 
-        Write-debug "Apply:`n $($prop | ConvertTo-Json)`n to $($v.ResourceId)."
-        Write-verbose "Using $FullArtifactId on $($v.ResourceId)"
-        Invoke-AzureRmResourceAction -Parameters $prop -ResourceId $v.ResourceId -Action "applyArtifacts" -ApiVersion 2016-05-15 -Force | Out-Null
-        $v  | Get-AzDtlVm
+      foreach($v in $Vm) {
+          if($AsJob.IsPresent) {
+            Start-Job      -ScriptBlock $sb -ArgumentList $v, $RepositoryName, $ArtifactName, $artifactParameters, $justAz
+          } else {
+            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $RepositoryName, $ArtifactName, $artifactParameters, $justAz
+          }
       }
     } catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
