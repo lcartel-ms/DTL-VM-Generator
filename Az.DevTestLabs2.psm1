@@ -28,7 +28,7 @@ if($justAzureRm) {
     # This is not defaulted in older versions of AzureRM
 
     # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-    Save-AzContext -Path (Join-Path $env:TEMP "AzContext.json") -Force | Out-Null    # Save the context (WORKAROUND)
+    Save-AzContext -Path (Join-Path "." "AzContext.json") -Force | Out-Null    # Save the context (WORKAROUND)
     Disable-AzContextAutosave -Scope Process | Out-Null
     Write-Warning "You are using the deprecated AzureRM module. For more info, read https://docs.microsoft.com/en-us/powershell/azure/migrate-from-azurerm-to-az"
   }
@@ -37,7 +37,7 @@ if($justAzureRm) {
 if($justAz) {
   Enable-AzureRmAlias -Scope Local
   # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-  Save-AzContext -Path (Join-Path $env:TEMP "AzContext.json") -Force | Out-Null    # Save the context (WORKAROUND)
+  Save-AzContext -Path (Join-Path "." "AzContext.json") -Force | Out-Null    # Save the context (WORKAROUND)
   Disable-AzContextAutosave -Scope Process | Out-Null
 }
 
@@ -260,7 +260,7 @@ function DeployLab {
 
       # WORKAROUND
       Disable-AzContextAutosave -Scope Process | Out-Null
-      Import-AzContext -Path (Join-Path $env:TEMP "AzContext.json") | Out-Null
+      Import-AzContext -Path (Join-Path "." "AzContext.json") | Out-Null
     }
     
     $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -TemplateParameterObject $Parameters
@@ -696,7 +696,7 @@ function Add-AzDtlLabTags {
 
           # WORKAROUND
           Disable-AzContextAutosave -Scope Process | Out-Null
-          Import-AzContext -Path (Join-Path $env:TEMP "AzContext.json") | Out-Null
+          Import-AzContext -Path (Join-Path "." "AzContext.json") | Out-Null
         }
 
         if ($tagLabsResourceGroup) {
@@ -1161,7 +1161,7 @@ function Start-AzDtlVm {
 
             # WORKAROUND
             Disable-AzContextAutosave -Scope Process | Out-Null
-            Import-AzContext -Path (Join-Path $env:TEMP "AzContext.json") | Out-Null
+            Import-AzContext -Path (Join-Path "." "AzContext.json") | Out-Null
           }
 
           Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "start" -Force | Out-Null
@@ -1205,7 +1205,7 @@ function Stop-AzDtlVm {
 
             # WORKAROUND
             Disable-AzContextAutosave -Scope Process | Out-Null
-            Import-AzContext -Path (Join-Path $env:TEMP "AzContext.json") | Out-Null
+            Import-AzContext -Path (Join-Path "." "AzContext.json") | Out-Null
           }
 
           Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "stop" -Force | Out-Null
@@ -1606,7 +1606,7 @@ function Set-AzDtlVmArtifact {
 
                 # WORKAROUND
                 Disable-AzContextAutosave -Scope Process | Out-Null
-                Import-AzContext -Path (Join-Path $env:TEMP "AzContext.json") | Out-Null
+                Import-AzContext -Path (Join-Path "." "AzContext.json") | Out-Null
             }
 
             $ResourceGroupName = $v.ResourceGroupName
