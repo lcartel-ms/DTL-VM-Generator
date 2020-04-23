@@ -58,16 +58,15 @@ if (-not $existingLab) {
 Write-Host "Removing Vms from lab $DevTestLabName in $ResourceGroupName"
 $vms = Get-AzDtlVm -Lab $existingLab
 
-$selectedVms = Select-Vms $vms
+# $selectedVms = Select-Vms $vms
+$selectedVms = $vms
 
 $jobs = @()
 $selectedVms | ForEach-Object {
 
-  $sb = [scriptblock]::create(
-    @"
-    Remove-AzResource -ResourceId $($_.ResourceId) -Force
-"@)
-
+  $sb = {
+    Remove-AzDtlVm -Vm $Using:_
+  }
   $jobs += Start-RSJob -ScriptBlock $sb -Name $_.Name -ModulesToImport $AzDtlModulePath
 
   Start-Sleep -Seconds 2

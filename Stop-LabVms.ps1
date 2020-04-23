@@ -32,11 +32,9 @@ if (-not $runningVms) {
 
 $jobs = @()
 $runningVms | ForEach-Object {
-  $sb = [scriptblock]::create(
-    @"
-    Stop-AzDtlVm -Vm $_
-"@)
-
+  $sb = {
+    Stop-AzDtlVm -Vm $Using:_
+  }
   $jobs += Start-RSJob -ScriptBlock $sb -Name $_.Name -ModulesToImport $AzDtlModulePath
 
   Start-Sleep -Seconds 2
