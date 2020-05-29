@@ -28,7 +28,7 @@ if($justAzureRm) {
     # This is not defaulted in older versions of AzureRM
 
     # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-    Save-AzContext -Path (Join-Path "." "AzContext.json") -Force | Out-Null    # Save the context (WORKAROUND)
+    Save-AzContext -Path (Resolve-Path (Join-Path "." "AzContext.json")) -Force | Out-Null    # Save the context (WORKAROUND)
     Disable-AzContextAutosave -Scope Process | Out-Null
     Write-Warning "You are using the deprecated AzureRM module. For more info, read https://docs.microsoft.com/en-us/powershell/azure/migrate-from-azurerm-to-az"
   }
@@ -37,7 +37,7 @@ if($justAzureRm) {
 if($justAz) {
   Enable-AzureRmAlias -Scope Local
   # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-  Save-AzContext -Path (Join-Path "." "AzContext.json") -Force | Out-Null    # Save the context (WORKAROUND)
+  Save-AzContext -Path (Resolve-Path (Join-Path "." "AzContext.json")) -Force | Out-Null    # Save the context (WORKAROUND)
   Disable-AzContextAutosave -Scope Process | Out-Null
 }
 
@@ -253,14 +253,20 @@ function DeployLab {
   $jsonPath = StringToFile($arm)
 
   $sb = {
-    param($deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz)
+    param($deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz, $AsJob)
 
     if($justAz) {
       Enable-AzureRmAlias -Scope Local -Verbose:$false
 
       # WORKAROUND
       Disable-AzContextAutosave -Scope Process | Out-Null
-      Import-AzContext -Path (Join-Path "." "AzContext.json") | Out-Null
+      if ($AsJob) {
+        $profileLocation = (Resolve-Path (Join-Path $using:PWD "AzContext.json"))
+      }
+      else {
+        $profileLocation = (Resolve-Path (Join-Path "." "AzContext.json"))
+      }
+      Import-AzContext -Path $profileLocation | Out-Null
     }
     
     $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -TemplateParameterObject $Parameters
@@ -270,9 +276,9 @@ function DeployLab {
   }
 
   if($AsJob) {
-    Start-Job      -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz
+    Start-Job      -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz, $AsJob
   } else {
-    Invoke-Command -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz
+    Invoke-Command -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz, $AsJob
   }
 }
 
@@ -644,7 +650,7 @@ function Add-AzDtlLabTags {
     try{
 
       $sb = {
-        param($Lab, $tags, $justAz)
+        param($Lab, $tags, $justAz, $AsJob)
 
         function Unify-Tags {
             [CmdletBinding()]
@@ -696,7 +702,13 @@ function Add-AzDtlLabTags {
 
           # WORKAROUND
           Disable-AzContextAutosave -Scope Process | Out-Null
-          Import-AzContext -Path (Join-Path "." "AzContext.json") | Out-Null
+          if ($AsJob) {
+            $profileLocation = (Resolve-Path (Join-Path $using:PWD "AzContext.json"))
+          }
+          else {
+            $profileLocation = (Resolve-Path (Join-Path "." "AzContext.json"))
+          }
+          Import-AzContext -Path $profileLocation | Out-Null
         }
 
         if ($tagLabsResourceGroup) {
@@ -747,9 +759,9 @@ function Add-AzDtlLabTags {
       }
 
       if($AsJob) {
-        Start-Job      -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz
+        Start-Job      -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz, $AsJob
       } else {
-        Invoke-Command -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz
+        Invoke-Command -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz, $AsJob
       }
 
     } 
@@ -1154,14 +1166,20 @@ function Start-AzDtlVm {
     try {
 
         $sb = {
-          param($vm, $justAz)
+          param($vm, $justAz, $AsJob)
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
 
             # WORKAROUND
             Disable-AzContextAutosave -Scope Process | Out-Null
-            Import-AzContext -Path (Join-Path "." "AzContext.json") | Out-Null
+          if ($AsJob) {
+            $profileLocation = (Resolve-Path (Join-Path $using:PWD "AzContext.json"))
+          }
+          else {
+            $profileLocation = (Resolve-Path (Join-Path "." "AzContext.json"))
+          }
+          Import-AzContext -Path $profileLocation | Out-Null
           }
 
           Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "start" -Force | Out-Null
@@ -1171,9 +1189,9 @@ function Start-AzDtlVm {
       foreach($v in $Vm) {
 
           if($AsJob.IsPresent) {
-            Start-Job      -ScriptBlock $sb -ArgumentList $v, $justAz
+            Start-Job      -ScriptBlock $sb -ArgumentList $v, $justAz, $AsJob
           } else {
-            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $justAz
+            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $justAz, $AsJob
           }
       }
     } catch {
@@ -1198,14 +1216,20 @@ function Stop-AzDtlVm {
   process {
     try {
         $sb = {
-          param($vm, $justAz)
+          param($vm, $justAz, $AsJob)
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
 
             # WORKAROUND
             Disable-AzContextAutosave -Scope Process | Out-Null
-            Import-AzContext -Path (Join-Path "." "AzContext.json") | Out-Null
+            if ($AsJob) {
+                $profileLocation = (Resolve-Path (Join-Path $using:PWD "AzContext.json"))
+            }
+            else {
+                $profileLocation = (Resolve-Path (Join-Path "." "AzContext.json"))
+            }
+            Import-AzContext -Path $profileLocation | Out-Null
           }
 
           Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "stop" -Force | Out-Null
@@ -1215,9 +1239,9 @@ function Stop-AzDtlVm {
       foreach($v in $Vm) {
 
           if($AsJob.IsPresent) {
-            Start-Job      -ScriptBlock $sb -ArgumentList $v, $justAz
+            Start-Job      -ScriptBlock $sb -ArgumentList $v, $justAz, $AsJob
           } else {
-            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $justAz
+            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $justAz, $AsJob
           }
       }
     } catch {
@@ -1598,7 +1622,8 @@ function Set-AzDtlVmArtifact {
                 [string] $RepositoryName,
                 [string] $ArtifactName,
                 [array] $ArtifactParameters = @(),
-                $justAz
+                $justAz,
+                $AsJob
             )
 
             if($justAz) {
@@ -1606,7 +1631,13 @@ function Set-AzDtlVmArtifact {
 
                 # WORKAROUND
                 Disable-AzContextAutosave -Scope Process | Out-Null
-                Import-AzContext -Path (Join-Path "." "AzContext.json") | Out-Null
+               if ($AsJob) {
+                 $profileLocation = (Resolve-Path (Join-Path $using:PWD "AzContext.json"))
+               }
+               else {
+                 $profileLocation = (Resolve-Path (Join-Path "." "AzContext.json"))
+               }
+               Import-AzContext -Path $profileLocation | Out-Null
             }
 
             $ResourceGroupName = $v.ResourceGroupName
@@ -1664,9 +1695,9 @@ function Set-AzDtlVmArtifact {
 
       foreach($v in $Vm) {
           if($AsJob.IsPresent) {
-            Start-Job      -ScriptBlock $sb -ArgumentList $v, $RepositoryName, $ArtifactName, $artifactParameters, $justAz
+            Start-Job      -ScriptBlock $sb -ArgumentList $v, $RepositoryName, $ArtifactName, $artifactParameters, $justAz, $AsJob
           } else {
-            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $RepositoryName, $ArtifactName, $artifactParameters, $justAz
+            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $RepositoryName, $ArtifactName, $artifactParameters, $justAz, $AsJob
           }
       }
     } catch {

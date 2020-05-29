@@ -43,11 +43,6 @@ $labCreateJobs = $config | ForEach-Object {
                            }
 Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
 
-# Apply Windows Updates as a mandatory artifact in the labs
-$config | ForEach-Object {
-    $_ | Set-AzDtlMandatoryArtifacts -WindowsArtifactNames "windows-install-windows-updates"
-}
-
 # Update the shutdown policy on the labs
 Write-Host "---------------------------------" -ForegroundColor Green
 Write-Host "Updating $configCount labs with correct shutdown policy..." -ForegroundColor Green

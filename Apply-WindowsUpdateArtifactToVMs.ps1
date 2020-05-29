@@ -4,6 +4,9 @@
     [ValidateNotNullOrEmpty()]
     [string] $ConfigFile = "config.csv",
 
+    [Parameter(HelpMessage="String containing comma delimitated list of patterns. The script will apply updates to just the VMs matching one of the patterns.")]
+    [string] $ImagePattern = "",
+
     [Parameter(Mandatory=$false, HelpMessage="Shutdown the VMs when done?")]
     [ValidateNotNullOrEmpty()]
     [boolean] $shutdownVMs = $false
@@ -22,8 +25,21 @@ $config = Import-Csv $ConfigFile
 # Foreach lab, get all the VMs
 $config | ForEach-Object {
     Write-Host "----------------------------------------------------------" -ForegroundColor Green
-    Write-Host "Applying Windows Update to all VMs in DevTestLab: $($_.DevTestLabName)" -ForegroundColor Green
+    Write-Host "Applying Windows Update to all VMs in DevTestLab: $($_.DevTestLabName) matching pattern: '$($ImagePattern)'" -ForegroundColor Green
     $vms = Get-AzDtlVm -Lab @{Name = $_.DevTestLabName; ResourceGroupName = $_.ResourceGroupName}
+    
+    # Trim down the list of VMs based on the image pattern passed in...
+    if ($ImagePattern) {
+        $vms = $vms | Where-Object {
+            $name = $_.Name
+            $ImagePattern.Split(",").Trim() | ForEach-Object {
+                if ($name -like $_) {
+                    $true
+                }
+            }
+        }
+    }
+
     $vms | Select-Object `
         @{label="Name";expression={$_.Name}},
         @{label="ProvisioningState";expression={$_.Properties.provisioningState}},
