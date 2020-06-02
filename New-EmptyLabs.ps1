@@ -53,7 +53,7 @@ Wait-JobWithProgress -jobs ($config | Set-AzDtlLabShutdown -AsJob) -secTimeout 3
 
 # Update the IP Policy on the labs
 Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Updating $configCount labs with IP Policy specified, $IpConfig ..." -ForegroundColor Green
+Write-Host "Updating $configCount labs with $IpConfig IP Policy ..." -ForegroundColor Green
 $config | Set-AzDtlLabIpPolicy -IpConfig $IpConfig
 
 # Add appropriate owner/user permissions for the labs
