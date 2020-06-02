@@ -800,48 +800,46 @@ function Set-AzDtlLabIpPolicy {
 }
 "@ | ConvertFrom-Json
 
-      foreach($l in $Lab) {
+      Write-verbose "Retrieving Virtual Network for lab $($Lab.Name) ..."
+      $vnets = Get-AzResource -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName -ResourceType 'Microsoft.DevTestLab/labs/virtualnetworks' -ApiVersion 2018-10-15-preview
 
-          Write-verbose "Retrieving Virtual Network for lab $($Lab.Name) ..."
-          $vnets = Get-AzResource -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName -ResourceType 'Microsoft.DevTestLab/labs/virtualnetworks' -ApiVersion 2018-10-15-preview
-
-          # Iterate through the vnets for all the subnets
-          foreach ($vnet in $vnets) {
-            # Iterate through the subnets and set the properties appropriately
-            foreach ($subnet in $vnet.Properties.subnetOverrides) {
-                # Only update if it matches the subnet name/subnetname is missing AND if this is a VNet used for VM Creation
-                if ((-not $SubnetName -or ($subnet.labSubnetName -like $SubnetName)) -and ($subnet.useInVmCreationPermission -eq "Allow")) {
-                    if ($IpConfig -eq 'Shared') {
-                        if ($subnet.PSObject.Properties.Name -match "sharedPublicIpAddressConfiguration") {
-                            $subnet.sharedPublicIpAddressConfiguration = $sharedIpConfig
-                        }
-                        else {
-                            Add-Member -InputObject $subnet -MemberType NoteProperty -Name "sharedPublicIpAddressConfiguration" -Value $sharedIpConfig
-                        }
-
-                        $subnet.usePublicIpAddressPermission = $false
+      # Iterate through the vnets for all the subnets
+      foreach ($vnet in $vnets) {
+        # Iterate through the subnets and set the properties appropriately
+        foreach ($subnet in $vnet.Properties.subnetOverrides) {
+            # Only update if it matches the subnet name/subnetname is missing AND if this is a VNet used for VM Creation
+            if ((-not $SubnetName -or ($subnet.labSubnetName -like $SubnetName)) -and ($subnet.useInVmCreationPermission -eq "Allow")) {
+                if ($IpConfig -eq 'Shared') {
+                    if ($subnet.PSObject.Properties.Name -match "sharedPublicIpAddressConfiguration") {
+                        $subnet.sharedPublicIpAddressConfiguration = $sharedIpConfig
                     }
-                    elseif ($IpConfig -eq 'Public') {
-                        if ($subnet.PSObject.Properties.Name -match "sharedPublicIpAddressConfiguration") {
-                            $subnet.PSObject.Properties.Remove("sharedPublicIpAddressConfiguration")
-                        }
-
-                        $subnet.usePublicIpAddressPermission = $true
-
+                    else {
+                        Add-Member -InputObject $subnet -MemberType NoteProperty -Name "sharedPublicIpAddressConfiguration" -Value $sharedIpConfig
                     }
-                    elseif ($IpConfig -eq 'Private') {
-                        if ($subnet.PSObject.Properties.Name -match "sharedPublicIpAddressConfiguration") {
-                            $subnet.PSObject.Properties.Remove("sharedPublicIpAddressConfiguration")
-                        }
 
-                        $subnet.usePublicIpAddressPermission = $false
+                    $subnet.usePublicIpAddressPermission = $false
+                }
+                elseif ($IpConfig -eq 'Public') {
+                    if ($subnet.PSObject.Properties.Name -match "sharedPublicIpAddressConfiguration") {
+                        $subnet.PSObject.Properties.Remove("sharedPublicIpAddressConfiguration")
                     }
+
+                    $subnet.usePublicIpAddressPermission = $true
+
+                }
+                elseif ($IpConfig -eq 'Private') {
+                    if ($subnet.PSObject.Properties.Name -match "sharedPublicIpAddressConfiguration") {
+                        $subnet.PSObject.Properties.Remove("sharedPublicIpAddressConfiguration")
+                    }
+
+                    $subnet.usePublicIpAddressPermission = $false
                 }
             }
-            # Push this VNet back to Azure
-            Set-AzResource -ResourceId $vnet.ResourceId -Properties $vnet.Properties -Force | Out-Null
-          }
+        }
+        # Push this VNet back to Azure
+        Set-AzResource -ResourceId $vnet.ResourceId -Properties $vnet.Properties -Force
       }
+
       # Return the lab to continue in the pipeline
       return $Lab
     } 
