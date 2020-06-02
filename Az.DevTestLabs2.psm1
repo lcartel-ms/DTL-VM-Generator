@@ -26,19 +26,14 @@ if($justAzureRm) {
     Write-Error "This module does not work correctly with version 5 or lower of AzureRM, please upgrade to a newer version of Azure PowerShell in order to use this module."
   } else {
     # This is not defaulted in older versions of AzureRM
-
-    # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-    Save-AzContext -Path (Resolve-Path (Join-Path "." "AzContext.json")) -Force | Out-Null    # Save the context (WORKAROUND)
-    Disable-AzContextAutosave -Scope Process | Out-Null
+    Enable-AzContextAutosave -Scope Process | Out-Null
     Write-Warning "You are using the deprecated AzureRM module. For more info, read https://docs.microsoft.com/en-us/powershell/azure/migrate-from-azurerm-to-az"
   }
 }
 
 if($justAz) {
   Enable-AzureRmAlias -Scope Local
-  # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-  Save-AzContext -Path (Resolve-Path (Join-Path "." "AzContext.json")) -Force | Out-Null    # Save the context (WORKAROUND)
-  Disable-AzContextAutosave -Scope Process | Out-Null
+  Enable-AzContextAutosave -Scope Process | Out-Null
 }
 
 # We want to track usage of library, so adding GUID to user-agent at loading and removig it at unloading
@@ -259,14 +254,11 @@ function DeployLab {
       Enable-AzureRmAlias -Scope Local -Verbose:$false
 
       # WORKAROUND
-      Disable-AzContextAutosave -Scope Process | Out-Null
-      if ($AsJob) {
-        $profileLocation = (Resolve-Path (Join-Path $using:PWD "AzContext.json"))
-      }
-      else {
-        $profileLocation = (Resolve-Path (Join-Path "." "AzContext.json"))
-      }
-      Import-AzContext -Path $profileLocation | Out-Null
+      $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+      $Mutex.WaitOne() | Out-Null
+      Enable-AzContextAutosave -Scope Process | Out-Null
+      $rg = Get-AzResourceGroup | Out-Null
+      $Mutex.ReleaseMutex() | Out-Null
     }
     
     $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -TemplateParameterObject $Parameters
@@ -327,7 +319,11 @@ function DeployVm {
     param($deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz)
 
     if($justAz) {
-      Enable-AzureRmAlias -Scope Local -Verbose:$false
+      $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+      $Mutex.WaitOne() | Out-Null
+      Enable-AzContextAutosave -Scope Process | Out-Null
+      $rg = Get-AzResourceGroup | Out-Null
+      $Mutex.ReleaseMutex() | Out-Null
     }
     $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -TemplateParameterObject $Parameters
     Write-debug "Deployment succeded with deployment of `n$deployment"
@@ -699,16 +695,11 @@ function Add-AzDtlLabTags {
 
         if($justAz) {
           Enable-AzureRmAlias -Scope Local -Verbose:$false
-
-          # WORKAROUND
-          Disable-AzContextAutosave -Scope Process | Out-Null
-          if ($AsJob) {
-            $profileLocation = (Resolve-Path (Join-Path $using:PWD "AzContext.json"))
-          }
-          else {
-            $profileLocation = (Resolve-Path (Join-Path "." "AzContext.json"))
-          }
-          Import-AzContext -Path $profileLocation | Out-Null
+          $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+          $Mutex.WaitOne() | Out-Null
+          Enable-AzContextAutosave -Scope Process | Out-Null
+          $rg = Get-AzResourceGroup | Out-Null
+          $Mutex.ReleaseMutex() | Out-Null
         }
 
         if ($tagLabsResourceGroup) {
@@ -771,6 +762,96 @@ function Add-AzDtlLabTags {
   } 
   end {
   }
+}
+
+function Set-AzDtlLabIpPolicy {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Lab to query for Shared Image Gallery")]
+    [ValidateNotNullOrEmpty()]
+    $Lab,
+
+    [parameter(Mandatory=$false, HelpMessage="Name of the subnet to update the properties.  If left out, all subnets are updated")]
+    [string]
+    $SubnetName,
+
+    [parameter(Mandatory=$true, HelpMessage="Public=separate IP Address, Shared=load balancers optimizes IP Addresses, Private=No public IP address.")]
+    [Validateset('Public','Private', 'Shared')]
+    [string]
+    $IpConfig = 'Shared'
+  )
+
+  begin {. BeginPreamble}
+  process {
+    try{
+
+      $sharedIpConfig = @"
+{
+    "allowedPorts":  [
+                        {
+                            "transportProtocol" : "Tcp",
+                            "backendPort" : "3389"
+                        },
+                        {
+                            "transportProtocol" : "Tcp",
+                            "backendPort" : "22"
+                        }
+                        ]
+}
+"@ | ConvertFrom-Json
+
+      foreach($l in $Lab) {
+
+          Write-verbose "Retrieving Virtual Network for lab $($Lab.Name) ..."
+          $vnets = Get-AzResource -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName -ResourceType 'Microsoft.DevTestLab/labs/virtualnetworks' -ApiVersion 2018-10-15-preview
+
+          # Iterate through the vnets for all the subnets
+          foreach ($vnet in $vnets) {
+            # Iterate through the subnets and set the properties appropriately
+            foreach ($subnet in $vnet.Properties.subnetOverrides) {
+                # Only update if it matches the subnet name/subnetname is missing AND if this is a VNet used for VM Creation
+                if ((-not $SubnetName -or ($subnet.labSubnetName -like $SubnetName)) -and ($subnet.useInVmCreationPermission -eq "Allow")) {
+                    if ($IpConfig -eq 'Shared') {
+                        if ($subnet.PSObject.Properties.Name -match "sharedPublicIpAddressConfiguration") {
+                            $subnet.sharedPublicIpAddressConfiguration = $sharedIpConfig
+                        }
+                        else {
+                            Add-Member -InputObject $subnet -MemberType NoteProperty -Name "sharedPublicIpAddressConfiguration" -Value $sharedIpConfig
+                        }
+
+                        $subnet.usePublicIpAddressPermission = $false
+                    }
+                    elseif ($IpConfig -eq 'Public') {
+                        if ($subnet.PSObject.Properties.Name -match "sharedPublicIpAddressConfiguration") {
+                            $subnet.PSObject.Properties.Remove("sharedPublicIpAddressConfiguration")
+                        }
+
+                        $subnet.usePublicIpAddressPermission = $true
+
+                    }
+                    elseif ($IpConfig -eq 'Private') {
+                        if ($subnet.PSObject.Properties.Name -match "sharedPublicIpAddressConfiguration") {
+                            $subnet.PSObject.Properties.Remove("sharedPublicIpAddressConfiguration")
+                        }
+
+                        $subnet.usePublicIpAddressPermission = $false
+                    }
+                }
+            }
+            # Push this VNet back to Azure
+            Set-AzResource -ResourceId $vnet.ResourceId -Properties $vnet.Properties -Force | Out-Null
+          }
+      }
+      # Return the lab to continue in the pipeline
+      return $Lab
+    } 
+    catch {
+      Write-Error -ErrorRecord $_ -EA $callerEA
+    }
+  } 
+  end {
+  }
+
 }
 
 function Get-AzDtlLabSharedImageGallery {
@@ -1170,16 +1251,11 @@ function Start-AzDtlVm {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
-
-            # WORKAROUND
-            Disable-AzContextAutosave -Scope Process | Out-Null
-          if ($AsJob) {
-            $profileLocation = (Resolve-Path (Join-Path $using:PWD "AzContext.json"))
-          }
-          else {
-            $profileLocation = (Resolve-Path (Join-Path "." "AzContext.json"))
-          }
-          Import-AzContext -Path $profileLocation | Out-Null
+            $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+            $Mutex.WaitOne() | Out-Null
+            Enable-AzContextAutosave -Scope Process | Out-Null
+            $rg = Get-AzResourceGroup | Out-Null
+            $Mutex.ReleaseMutex() | Out-Null
           }
 
           Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "start" -Force | Out-Null
@@ -1220,16 +1296,12 @@ function Stop-AzDtlVm {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
-
-            # WORKAROUND
-            Disable-AzContextAutosave -Scope Process | Out-Null
-            if ($AsJob) {
-                $profileLocation = (Resolve-Path (Join-Path $using:PWD "AzContext.json"))
-            }
-            else {
-                $profileLocation = (Resolve-Path (Join-Path "." "AzContext.json"))
-            }
-            Import-AzContext -Path $profileLocation | Out-Null
+            $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+            $Mutex.WaitOne() | Out-Null
+            Enable-AzContextAutosave -Scope Process | Out-Null
+            $rg = Get-AzResourceGroup | Out-Null
+            $Mutex.ReleaseMutex() | Out-Null
+     
           }
 
           Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "stop" -Force | Out-Null
@@ -1628,16 +1700,12 @@ function Set-AzDtlVmArtifact {
 
             if($justAz) {
                 Enable-AzureRmAlias -Scope Local -Verbose:$false
-
-                # WORKAROUND
-                Disable-AzContextAutosave -Scope Process | Out-Null
-               if ($AsJob) {
-                 $profileLocation = (Resolve-Path (Join-Path $using:PWD "AzContext.json"))
-               }
-               else {
-                 $profileLocation = (Resolve-Path (Join-Path "." "AzContext.json"))
-               }
-               Import-AzContext -Path $profileLocation | Out-Null
+                $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+                $Mutex.WaitOne() | Out-Null
+                Enable-AzContextAutosave -Scope Process | Out-Null
+                $rg = Get-AzResourceGroup | Out-Null
+                $Mutex.ReleaseMutex() | Out-Null
+          
             }
 
             $ResourceGroupName = $v.ResourceGroupName
@@ -2068,6 +2136,11 @@ function New-AzDtlVm {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
+            $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+            $Mutex.WaitOne() | Out-Null
+            Enable-AzContextAutosave -Scope Process | Out-Null
+            $rg = Get-AzResourceGroup | Out-Null
+            $Mutex.ReleaseMutex() | Out-Null
           }
           $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -existingLabName $Name -newVmName $VmName
           Write-debug "Deployment succeded with deployment of `n$deployment"
@@ -3323,6 +3396,11 @@ function Import-AzDtlCustomImageFromUri {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
+            $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+            $Mutex.WaitOne() | Out-Null
+            Enable-AzContextAutosave -Scope Process | Out-Null
+            $rg = Get-AzResourceGroup | Out-Null
+            $Mutex.ReleaseMutex() | Out-Null
           }
           # Get storage account for the lab
           $labRgName= $l.ResourceGroupName
@@ -3490,6 +3568,7 @@ New-Alias -Name 'Dtl-ApplyArtifact'       -Value Set-AzDtlVmArtifact
 New-Alias -Name 'Dtl-GetLabSchedule'      -Value Get-AzDtlLabSchedule
 New-Alias -Name 'Dtl-SetLabShutdown'      -Value Set-AzDtlLabShutdown
 New-Alias -Name 'Dtl-SetLabStartup'       -Value Set-AzDtlLabStartupSchedule
+New-Alias -Name 'Dtl-SetLabIpPolicy'      -Value Set-AzDtlLabIpPolicy
 New-Alias -Name 'Dtl-SetLabShutPolicy'    -Value Set-AzDtlShutdownPolicy
 New-Alias -Name 'Dtl-SetMandatoryArtifacts' -value Set-AzDtlMandatoryArtifacts
 New-Alias -Name 'Dtl-GetLabAllowedVmSizePolicy' -Value Get-AzDtlLabAllowedVmSizePolicy
@@ -3541,6 +3620,7 @@ Export-ModuleMember -Function New-AzDtlLab,
                               Set-AzDtlShutdownPolicy,
                               Set-AzDtlVmAutoStart,
                               Set-AzDtlVmShutdownSchedule,
+                              Set-AzDtlLabIpPolicy,
                               Get-AzDtlLabAllowedVmSizePolicy,
                               Set-AzDtlLabAllowedVmSizePolicy,
                               Get-AzDtlLabSharedImageGallery,
