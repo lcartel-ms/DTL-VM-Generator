@@ -34,6 +34,12 @@ param
 
 $ErrorActionPreference = "Stop"
 
+# Workaround for https://github.com/Azure/azure-powershell/issues/9448
+$Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\DTL-VM-GENERATOR"
+$Mutex.WaitOne() | Out-Null
+$rg = Get-AzResourceGroup | Out-Null
+$Mutex.ReleaseMutex() | Out-Null
+
 . "./Utils.ps1"
 
 Write-Host "Start setting VMs in $DevTestLabName ..."

@@ -3,15 +3,18 @@ param
     [Parameter(Mandatory=$false, HelpMessage="Configuration File, see example in directory")]
     [ValidateNotNullOrEmpty()]
     [string] $ConfigFile = "config.csv",
-
     
     [Parameter(Mandatory=$false, HelpMessage="How many seconds to wait before starting the next parallel lab creation")]
     [int] $SecondsBetweenLoop =  10,
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="Custom Role to add users to")]
-    [string] $CustomRole =  "No VM Creation User"
+    [string] $CustomRole =  "No VM Creation User",
 
+    [parameter(Mandatory=$true, HelpMessage="IP Configuration for VMs in the lab.  Public=separate IP Address, Shared=load balancers optimizes IP Addresses, Private=No public IP address.")]
+    [Validateset('Public','Private', 'Shared')]
+    [string]
+    $IpConfig = 'Public'
 )
 
 $ErrorActionPreference = "Stop"
@@ -48,6 +51,10 @@ Write-Host "---------------------------------" -ForegroundColor Green
 Write-Host "Updating $configCount labs with correct shutdown policy..." -ForegroundColor Green
 Wait-JobWithProgress -jobs ($config | Set-AzDtlLabShutdown -AsJob) -secTimeout 300
 
+# Update the IP Policy on the labs
+Write-Host "---------------------------------" -ForegroundColor Green
+Write-Host "Updating $configCount labs with IP Policy specified, $IpConfig ..." -ForegroundColor Green
+$config | Set-AzDtlLabIpPolicy -IpConfig $IpConfig
 
 # Add appropriate owner/user permissions for the labs
 Write-Host "---------------------------------" -ForegroundColor Green
