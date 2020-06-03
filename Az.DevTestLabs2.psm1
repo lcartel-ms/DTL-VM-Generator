@@ -1884,7 +1884,7 @@ function New-AzDtlVm {
     [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Public=separate IP Address, Shared=load balancers optimizes IP Addresses, Private=No public IP address.")]
     [Validateset('Public','Private', 'Shared')]
     [string]
-    $IpConfig = 'Shared',
+    $IpConfig,
 
     # We need to know the OS even in the custom image case to know which NAT rules to add in the shared IP scenario
     # TODO: perhaps the OS for a custom image can be retrieved. Then the user can not pass this, but we pay the price with one more network trip.

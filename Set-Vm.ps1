@@ -52,6 +52,7 @@ foreach($descr in $VmSettings) {
                               -StorageType $descr.storageType `
                               -CustomImage $imageName `
                               -Notes $descr.description `
+                              -OsType $descr.osType `
                               -AsJob
 
   Start-Sleep -Seconds 60
