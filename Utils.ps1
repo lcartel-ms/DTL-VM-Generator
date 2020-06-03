@@ -84,7 +84,7 @@ function Set-LabAccessControl {
         Write-Host "$owneremail added as Owner in Lab '$DevTestLabName'"
     }
     else {
-        Write-Host "Unable to add $owneremail as Owner in Lab '$DevTestLabName', cannot find the user in AAD" -ForegroundColor Yellow
+        Write-Host "Unable to add $owneremail as Owner in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
     }
   }
 
