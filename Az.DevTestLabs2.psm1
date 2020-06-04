@@ -256,6 +256,7 @@ function DeployLab {
       # WORKAROUND
       $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
       $Mutex.WaitOne() | Out-Null
+      Enable-AzContextAutosave -Scope Process | Out-Null
       $rg = Get-AzResourceGroup | Out-Null
       $Mutex.ReleaseMutex() | Out-Null
     }
@@ -320,6 +321,7 @@ function DeployVm {
     if($justAz) {
       $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
       $Mutex.WaitOne() | Out-Null
+      Enable-AzContextAutosave -Scope Process | Out-Null
       $rg = Get-AzResourceGroup | Out-Null
       $Mutex.ReleaseMutex() | Out-Null
     }
@@ -695,6 +697,7 @@ function Add-AzDtlLabTags {
           Enable-AzureRmAlias -Scope Local -Verbose:$false
           $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
           $Mutex.WaitOne() | Out-Null
+          Enable-AzContextAutosave -Scope Process | Out-Null
           $rg = Get-AzResourceGroup | Out-Null
           $Mutex.ReleaseMutex() | Out-Null
         }
@@ -1248,6 +1251,7 @@ function Start-AzDtlVm {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
             $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
             $Mutex.WaitOne() | Out-Null
+            Enable-AzContextAutosave -Scope Process | Out-Null
             $rg = Get-AzResourceGroup | Out-Null
             $Mutex.ReleaseMutex() | Out-Null
           }
@@ -1292,6 +1296,7 @@ function Stop-AzDtlVm {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
             $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
             $Mutex.WaitOne() | Out-Null
+            Enable-AzContextAutosave -Scope Process | Out-Null
             $rg = Get-AzResourceGroup | Out-Null
             $Mutex.ReleaseMutex() | Out-Null
      
@@ -1695,6 +1700,7 @@ function Set-AzDtlVmArtifact {
                 Enable-AzureRmAlias -Scope Local -Verbose:$false
                 $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
                 $Mutex.WaitOne() | Out-Null
+                Enable-AzContextAutosave -Scope Process | Out-Null
                 $rg = Get-AzResourceGroup | Out-Null
                 $Mutex.ReleaseMutex() | Out-Null
           
@@ -2130,6 +2136,7 @@ function New-AzDtlVm {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
             $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
             $Mutex.WaitOne() | Out-Null
+            Enable-AzContextAutosave -Scope Process | Out-Null
             $rg = Get-AzResourceGroup | Out-Null
             $Mutex.ReleaseMutex() | Out-Null
           }
@@ -3389,6 +3396,7 @@ function Import-AzDtlCustomImageFromUri {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
             $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
             $Mutex.WaitOne() | Out-Null
+            Enable-AzContextAutosave -Scope Process | Out-Null
             $rg = Get-AzResourceGroup | Out-Null
             $Mutex.ReleaseMutex() | Out-Null
           }
