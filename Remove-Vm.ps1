@@ -64,8 +64,7 @@ if (-not $existingLab) {
 Write-Host "Removing Vms from lab $DevTestLabName in $ResourceGroupName"
 $vms = Get-AzDtlVm -Lab $existingLab
 
-# $selectedVms = Select-Vms $vms
-$selectedVms = $vms
+$selectedVms = Select-Vms $vms
 
 $jobs = @()
 $selectedVms | ForEach-Object {
