@@ -13,7 +13,7 @@ param
 
 $ErrorActionPreference = "Stop"
 # Workaround for https://github.com/Azure/azure-powershell/issues/9448
-$Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\DTL-VM-GENERATOR"
+$Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
 $Mutex.WaitOne() | Out-Null
 $rg = Get-AzResourceGroup | Out-Null
 $Mutex.ReleaseMutex() | Out-Null
@@ -34,7 +34,7 @@ $snapshots | ForEach-Object {
   $sb = {
 
     # Workaround for https://github.com/Azure/azure-powershell/issues/9448
-    $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\DTL-VM-GENERATOR"
+    $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
     $Mutex.WaitOne() | Out-Null
     $rg = Get-AzResourceGroup | Out-Null
     $Mutex.ReleaseMutex() | Out-Null

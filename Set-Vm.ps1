@@ -6,6 +6,9 @@ param
     [Parameter(Mandatory=$true, HelpMessage="The Name of the resource group")]
     [string] $ResourceGroupName,
 
+    [parameter(Mandatory=$true, HelpMessage="Public=separate IP Address, Shared=load balancers optimizes IP Addresses, Private=No public IP address.")]
+    [string] $LabIpConfig,
+
     [ValidateSet("Delete","Leave","Error")]
     [Parameter(Mandatory=$true, HelpMessage="What to do if a VM with the same name exist in the lab (Delete, Leave, Error)")]
     [string] $IfExist,
@@ -53,6 +56,7 @@ foreach($descr in $VmSettings) {
                               -CustomImage $imageName `
                               -Notes $descr.description `
                               -OsType $descr.osType `
+                              -IpConfig $LabIpConfig `
                               -AsJob
 
   Start-Sleep -Seconds 60

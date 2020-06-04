@@ -51,11 +51,6 @@ function Import-AzDtlModule {
 }
 
 function Remove-AzDtlModule {
-   # WORKAROUND:  Delete the azure context that we saved to disk
-   if (Test-Path (Join-Path $env:TEMP "AzContext.json")) {
-     Remove-Item (Join-Path $env:TEMP "AzContext.json") -Force
-   }
-
    Remove-Module -Name "Az.DevTesTLabs2" -ErrorAction SilentlyContinue
 }
 
@@ -265,6 +260,11 @@ function Import-ConfigFile {
   $config | ForEach-Object {
     $lab = $_
 
+    # Confirm that the IpConfig is one of 3 options:
+    if ($lab.IpConfig -ne "Public" -and $lab.IpConfig -ne "Shared" -and $lab.Ipconfig -ne "Private") {
+        Write-Error "IpConfig either missing or incorrect for lab $($lab.DevTestLabName).  Must be 'Public', 'Private', or 'Shared'"
+    }
+
     # Also add "Name" since that's used by the DTL Library for DevTestLabName
     Add-Member -InputObject $lab -MemberType NoteProperty -Name "Name" -Value $lab.DevTestLabName
 
@@ -426,6 +426,7 @@ function Invoke-RSForEachLab {
       LabRegion='$($lab.LabRegion)';
       LabOwners= @($ownStr);
       LabUsers= @($userStr);
+      LabIpConfig='$($lab.IpConfig)';
       CustomRole='$($customRole)';
       ImagePattern='$($ImagePattern)';
       IfExist='$($IfExist)';

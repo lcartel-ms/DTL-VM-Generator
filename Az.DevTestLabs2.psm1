@@ -256,7 +256,6 @@ function DeployLab {
       # WORKAROUND
       $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
       $Mutex.WaitOne() | Out-Null
-      Enable-AzContextAutosave -Scope Process | Out-Null
       $rg = Get-AzResourceGroup | Out-Null
       $Mutex.ReleaseMutex() | Out-Null
     }
@@ -321,7 +320,6 @@ function DeployVm {
     if($justAz) {
       $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
       $Mutex.WaitOne() | Out-Null
-      Enable-AzContextAutosave -Scope Process | Out-Null
       $rg = Get-AzResourceGroup | Out-Null
       $Mutex.ReleaseMutex() | Out-Null
     }
@@ -697,7 +695,6 @@ function Add-AzDtlLabTags {
           Enable-AzureRmAlias -Scope Local -Verbose:$false
           $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
           $Mutex.WaitOne() | Out-Null
-          Enable-AzContextAutosave -Scope Process | Out-Null
           $rg = Get-AzResourceGroup | Out-Null
           $Mutex.ReleaseMutex() | Out-Null
         }
@@ -1251,7 +1248,6 @@ function Start-AzDtlVm {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
             $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
             $Mutex.WaitOne() | Out-Null
-            Enable-AzContextAutosave -Scope Process | Out-Null
             $rg = Get-AzResourceGroup | Out-Null
             $Mutex.ReleaseMutex() | Out-Null
           }
@@ -1296,7 +1292,6 @@ function Stop-AzDtlVm {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
             $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
             $Mutex.WaitOne() | Out-Null
-            Enable-AzContextAutosave -Scope Process | Out-Null
             $rg = Get-AzResourceGroup | Out-Null
             $Mutex.ReleaseMutex() | Out-Null
      
@@ -1700,7 +1695,6 @@ function Set-AzDtlVmArtifact {
                 Enable-AzureRmAlias -Scope Local -Verbose:$false
                 $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
                 $Mutex.WaitOne() | Out-Null
-                Enable-AzContextAutosave -Scope Process | Out-Null
                 $rg = Get-AzResourceGroup | Out-Null
                 $Mutex.ReleaseMutex() | Out-Null
           
@@ -1884,7 +1878,7 @@ function New-AzDtlVm {
     [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Public=separate IP Address, Shared=load balancers optimizes IP Addresses, Private=No public IP address.")]
     [Validateset('Public','Private', 'Shared')]
     [string]
-    $IpConfig,
+    $IpConfig = 'Shared',
 
     # We need to know the OS even in the custom image case to know which NAT rules to add in the shared IP scenario
     # TODO: perhaps the OS for a custom image can be retrieved. Then the user can not pass this, but we pay the price with one more network trip.
@@ -2136,7 +2130,6 @@ function New-AzDtlVm {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
             $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
             $Mutex.WaitOne() | Out-Null
-            Enable-AzContextAutosave -Scope Process | Out-Null
             $rg = Get-AzResourceGroup | Out-Null
             $Mutex.ReleaseMutex() | Out-Null
           }
@@ -3396,7 +3389,6 @@ function Import-AzDtlCustomImageFromUri {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
             $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
             $Mutex.WaitOne() | Out-Null
-            Enable-AzContextAutosave -Scope Process | Out-Null
             $rg = Get-AzResourceGroup | Out-Null
             $Mutex.ReleaseMutex() | Out-Null
           }

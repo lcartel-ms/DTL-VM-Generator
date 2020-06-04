@@ -9,12 +9,7 @@ param
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="Custom Role to add users to")]
-    [string] $CustomRole =  "No VM Creation User",
-
-    [parameter(Mandatory=$true, HelpMessage="IP Configuration for VMs in the lab.  Public=separate IP Address, Shared=load balancers optimizes IP Addresses, Private=No public IP address.")]
-    [Validateset('Public','Private', 'Shared')]
-    [string]
-    $IpConfig = 'Public'
+    [string] $CustomRole =  "No VM Creation User"
 )
 
 $ErrorActionPreference = "Stop"
@@ -53,8 +48,10 @@ Wait-JobWithProgress -jobs ($config | Set-AzDtlLabShutdown -AsJob) -secTimeout 3
 
 # Update the IP Policy on the labs
 Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Updating $configCount labs with $IpConfig IP Policy ..." -ForegroundColor Green
-$config | Set-AzDtlLabIpPolicy -IpConfig $IpConfig
+Write-Host "Updating $configCount labs with IP Policy ..." -ForegroundColor Green
+$config | ForEach-Object {
+    Set-AzDtlLabIpPolicy -Lab $_ -IpConfig $_.IpConfig
+}
 
 # Add appropriate owner/user permissions for the labs
 Write-Host "---------------------------------" -ForegroundColor Green
