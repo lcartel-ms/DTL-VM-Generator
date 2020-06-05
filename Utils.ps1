@@ -99,7 +99,7 @@ function Set-LabAccessControl {
         Write-Host "$useremail added as $customRole in Lab '$DevTestLabName'"
     }
     else {
-        Write-Host "Unable to add $useremail as $customRole in Lab '$DevTestLabName', cannot find the user in AAD" -ForegroundColor Yellow
+        Write-Host "Unable to add $useremail as $customRole in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
     }
   }
 }
