@@ -24,8 +24,12 @@ $configCount = ($config | Measure-Object).Count
 if ($tags) {
     Write-Host "---------------------------------" -ForegroundColor Green
     Write-Host "Tagging $configCount lab..." -ForegroundColor Green
-    $jobs = $config | Add-AzDtlLabTags -tags $tags -tagLabsResourceGroup $tagLabsResourceGroup -AsJob
-    Wait-JobWithProgress -jobs $jobs -secTimeout 3600
+    $jobs = $config | Add-AzDtlLabTags -tags $tags -tagLabsResourceGroup $tagLabsResourceGroup -Verbose 
+
+    # If there was nothing to tag, there won't be any jobs
+    if ($jobs) {
+        Wait-JobWithProgress -jobs $jobs -secTimeout 3600
+    }
 }
 
 Remove-AzDtlModule                                       # Remove the DTL Library

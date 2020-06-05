@@ -237,7 +237,7 @@ function DeployLab {
     if($justAz) {
       Enable-AzureRmAlias -Scope Local -Verbose:$false
 
-      # WORKAROUND
+      # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
       $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
       $Mutex.WaitOne() | Out-Null
       Enable-AzContextAutosave -Scope Process | Out-Null
@@ -303,6 +303,7 @@ function DeployVm {
     param($deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz)
 
     if($justAz) {
+      # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
       $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
       $Mutex.WaitOne() | Out-Null
       Enable-AzContextAutosave -Scope Process | Out-Null
@@ -629,84 +630,158 @@ function Add-AzDtlLabTags {
   process {
     try{
 
-      $sb = {
-        param($Lab, $tags, $justAz)
+        $StartJobIfNeeded = {
+            param($Resource, $IsResourceGroup, $tags, $AsJob)
 
-        function Unify-Tags {
-            [CmdletBinding()]
-            param(
-                [Parameter(Mandatory=$true)]
-                [AllowNull()]
-                [hashtable] $destinationTagList,
+            $tagSb = {
+                param($Resource, $IsResourceGroup, $newTags, $justAz)
 
-                [Parameter(Mandatory=$true)]
-                [AllowNull()]
-                [hashtable] $sourceTagList
-            )
+                Enable-AzureRmAlias -Scope Local -Verbose:$false
+                # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
+                $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+                $Mutex.WaitOne() | Out-Null
+                $rg = Get-AzResourceGroup -Name "Temp" -ErrorAction SilentlyContinue | Out-Null
+                $Mutex.ReleaseMutex() | Out-Null
 
-            # if the destination doesn't have any tags, just apply the whole set of tags from the source
-            if ($destinationTagList -eq $null) {
-                if ($sourceTagList -ne $null) {
-                    $finalTagList = $sourceTagList.Clone()
+                if ($IsResourceGroup) {
+                    # Apply the unified tags back to Azure
+                    Set-AzureRmResourceGroup -Id $Resource.ResourceId -Tag $newTags | Out-Null
                 }
                 else {
-                    $finalTagList = $null
+                    # Apply the unified tags back to Azure
+                    Set-AzureRmResource -ResourceId $Resource.ResourceId -Tag $newTags -Force | Out-Null
                 }
+                return
             }
-            else {
-                # The destination list has tags, let's compare each one to make sure none are missing
-                $finalTagList = $destinationTagList.Clone()
+                    
+            function Unify-Tags {
+                [CmdletBinding()]
+                param(
+                    [Parameter(Mandatory=$true)]
+                    [AllowNull()]
+                    [hashtable] $destinationTagList,
 
-                # If the source list of tags isn't null, lets merge the tags in
-                if ($sourceTagList -ne $null) {
-                    foreach ($sourceTag in $sourceTagList.GetEnumerator()) {
-                        # Does the dest contain the Tag?
-                        if ($finalTagList.Contains($sourceTag.Name)) {
-                            # If there's a tag with the same name and the value is different we should fix it
-                            if ($finalTagList[$sourceTag.Name] -ne $sourceTag.Value) {
-                                $finalTagList[$sourceTag.Name] = $sourceTag.Value
+                    [Parameter(Mandatory=$true)]
+                    [AllowNull()]
+                    [hashtable] $sourceTagList
+                )
+
+                # if the destination doesn't have any tags, just apply the whole set of tags from the source
+                if ($destinationTagList -eq $null) {
+                    if ($sourceTagList -ne $null) {
+                        $finalTagList = $sourceTagList.Clone()
+                    }
+                    else {
+                        $finalTagList = $null
+                    }
+                }
+                else {
+                    # The destination list has tags, let's compare each one to make sure none are missing
+                    $finalTagList = $destinationTagList.Clone()
+
+                    # If the source list of tags isn't null, lets merge the tags in
+                    if ($sourceTagList -ne $null) {
+                        foreach ($sourceTag in $sourceTagList.GetEnumerator()) {
+                            # Does the dest contain the Tag?
+                            if ($finalTagList.Contains($sourceTag.Name)) {
+                                # If there's a tag with the same name and the value is different we should fix it
+                                if ($finalTagList[$sourceTag.Name] -ne $sourceTag.Value) {
+                                    $finalTagList[$sourceTag.Name] = $sourceTag.Value
+                                }
                             }
-                        }
-                        else {
-                            # destination doesn't contain the tag, let's add it
-                            $finalTagList.Add($sourceTag.Name, $sourceTag.Value)
+                            else {
+                                # destination doesn't contain the tag, let's add it
+                                $finalTagList.Add($sourceTag.Name, $sourceTag.Value)
+                            }
                         }
                     }
                 }
+                $finalTagList
             }
-            $finalTagList
+
+            # From here: https://gist.github.com/dbroeglin/c6ce3e4639979fa250cf
+            function Compare-Hashtable {
+            [CmdletBinding()]
+                param (
+                    [Parameter(Mandatory = $true)]
+                    [Hashtable]$Left,
+
+                    [Parameter(Mandatory = $true)]
+                    [Hashtable]$Right		
+	            )
+	
+	            function New-Result($Key, $LValue, $Side, $RValue) {
+		            New-Object -Type PSObject -Property @{
+					            key    = $Key
+					            lvalue = $LValue
+					            rvalue = $RValue
+					            side   = $Side
+			            }
+	            }
+	            [Object[]]$Results = $Left.Keys | % {
+		            if ($Left.ContainsKey($_) -and !$Right.ContainsKey($_)) {
+			            New-Result $_ $Left[$_] "<=" $Null
+		            } else {
+			            $LValue, $RValue = $Left[$_], $Right[$_]
+			            if ($LValue -ne $RValue) {
+				            New-Result $_ $LValue "!=" $RValue
+			            }
+		            }
+	            }
+	            $Results += $Right.Keys | % {
+		            if (!$Left.ContainsKey($_) -and $Right.ContainsKey($_)) {
+			            New-Result $_ $Null "=>" $Right[$_]
+		            } 
+	            }
+	            $Results 
+            }
+
+            # If we have only the resource Id, let's get the full object
+            if ($Resource.GetType().Name -eq "String" -and $IsResourceGroup -eq $true) {
+                $Resource = Get-AzureRmResourceGroup -Id $Resource
+            }
+            if ($Resource.GetType().Name -eq "String" -and $IsResourceGroup -eq $false) {
+                $Resource = Get-AzureRmResource -ResourceId $Resource
+            }
+
+            # Check to see if the resource already has all the tags
+            $newTags = (Unify-Tags $Resource.Tags $tags)
+            if (Compare-Hashtable -Left $Resource.Tags -Right $newTags) {
+
+                if($AsJob) {
+                    Start-Job      -ScriptBlock $tagSb -ArgumentList $Resource, $IsResourceGroup, $newTags, $justAz
+                } else {
+                    Invoke-Command -ScriptBlock $tagSb -ArgumentList $Resource, $IsResourceGroup, $newTags, $justAz
+                }
+            }
+            else {
+                Write-Verbose "Tags are the same, can skip for ResourceId $($Resource.ResourceId)!"
+            }
         }
 
-        if($justAz) {
-          Enable-AzureRmAlias -Scope Local -Verbose:$false
-          $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-          $Mutex.WaitOne() | Out-Null
-          Enable-AzContextAutosave -Scope Process | Out-Null
-          $rg = Get-AzResourceGroup | Out-Null
-          $Mutex.ReleaseMutex() | Out-Null
-        }
-
+        # Tag the resource group if the user wants
         if ($tagLabsResourceGroup) {
             $labrg = Get-AzureRmResourceGroup -Name $Lab.ResourceGroupName
-            Set-AzureRmResourceGroup -Name $lab.ResourceGroupName -Tag (Unify-Tags $labrg.Tags $tags) | Out-Null
+            Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $labrg, $true, $tags, $justAz
         }
 
         # Get the lab resource and tag it
         $labObj = Get-AzureRmResource -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs"
-        Set-AzureRmResource -ResourceId $labObj.ResourceId -Tag (Unify-Tags $labObj.Tags $tags) -Force | Out-Null
+        Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $labObj, $false, $tags, $justAz
 
         # Get the DTL VMs and tag them
         Get-AzureRmResource -ResourceGroupName $Lab.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs/VirtualMachines" | Where-Object {
             $_.Name.StartsWith($Lab.Name + "/")
         } | ForEach-Object {
-            Set-AzureRmResource -ResourceId $_.ResourceId -Tag (Unify-Tags $_.Tags $tags) -FOrce | Out-Null
+            Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $_, $false, $tags, $justAz
         }
 
         # Find all the resources associated with this lab (only proceed if we found the lab)
         if ($labObj.Properties.uniqueIdentifier) {
             Get-AzureRmResource -TagName hidden-DevTestLabs-LabUId -TagValue $labObj.Properties.uniqueIdentifier `
                   | ForEach-Object {
-                      Set-AzureRmResource -ResourceId $_.ResourceId -Tag (Unify-Tags $_.Tags $tags) -Force | Out-Null
+
+                      Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $_, $false, $tags, $justAz
 
                       if ($_.ResourceType -eq 'Microsoft.Compute/virtualMachines') {
                          # We need to get the disks on the VM and tag those - disks from specialized images don't have a hidden tag
@@ -716,29 +791,20 @@ function Add-AzDtlLabTags {
                          # Tag the compute's resource group assuming it's not the lab's RG
                          if ($vm.ResourceGroupName -ne $labObj.ResourceGroupName) {
                             $vmRg = Get-AzureRmResourceGroup -Name $vm.ResourceGroupName
-                            Set-AzureRmResourceGroup -Name $vm.ResourceGroupName -Tag (Unify-Tags $vmRg.Tags $tags) | Out-Null
+
+                            Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $vmRg, $true, $tags, $justAz
                          }
 
                          # Add tags to the OS disk (VMs should always have an OS disk
-                         $disk = Get-AzureRmResource -ResourceId $vm.Properties.storageProfile.osDisk.managedDisk.id
-                         Set-AzureRmResource -ResourceId $disk.Id -Tag (Unify-Tags $disk.Tags $tags) -Force | Out-Null
+                         Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $vm.Properties.storageProfile.osDisk.managedDisk.id, $false, $tags, $justAz
 
                          # Add Tags to the data disks
                          $vm.Properties.storageProfile.dataDisks | ForEach-Object {
-                            $dataDisk = Get-AzureRmResource -ResourceId $_.managedDisk.id
-                            Set-AzureRmResource -ResourceId $dataDisk.Id -Tag (Unify-Tags $dataDisk.Tags $tags) -Force | Out-Null
-                         }
+                         Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $_.managedDisk.id, $false, $tags, $justAz
                       }
                   }
+              }
         }
-      }
-
-      if($AsJob) {
-        Start-Job      -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz
-      } else {
-        Invoke-Command -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz
-      }
-
     } 
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
@@ -1233,6 +1299,7 @@ function Start-AzDtlVm {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
+            # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
             $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
             $Mutex.WaitOne() | Out-Null
             Enable-AzContextAutosave -Scope Process | Out-Null
@@ -1278,6 +1345,7 @@ function Stop-AzDtlVm {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
+            # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
             $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
             $Mutex.WaitOne() | Out-Null
             Enable-AzContextAutosave -Scope Process | Out-Null
@@ -1681,6 +1749,7 @@ function Set-AzDtlVmArtifact {
 
             if($justAz) {
                 Enable-AzureRmAlias -Scope Local -Verbose:$false
+                # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
                 $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
                 $Mutex.WaitOne() | Out-Null
                 Enable-AzContextAutosave -Scope Process | Out-Null
@@ -2117,6 +2186,7 @@ function New-AzDtlVm {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
+            # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
             $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
             $Mutex.WaitOne() | Out-Null
             Enable-AzContextAutosave -Scope Process | Out-Null
@@ -3377,6 +3447,7 @@ function Import-AzDtlCustomImageFromUri {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
+            # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
             $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
             $Mutex.WaitOne() | Out-Null
             Enable-AzContextAutosave -Scope Process | Out-Null

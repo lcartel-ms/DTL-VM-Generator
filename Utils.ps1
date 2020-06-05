@@ -177,7 +177,7 @@ function Wait-JobWithProgress {
     $secTimeout
     )
 
-  Write-Host "Waiting for results at most $secTimeout seconds, or $( [math]::Round($secTimeout / 60,1)) minutes, or $( [math]::Round($secTimeout / 60 / 60,1)) hours ..."
+  Write-Host "Waiting for $(($jobs | Measure-Object).Count) job results at most $secTimeout seconds, or $( [math]::Round($secTimeout / 60,1)) minutes, or $( [math]::Round($secTimeout / 60 / 60,1)) hours ..."
 
   if(-not $jobs) {
     Write-Host "No jobs to wait for"
@@ -205,7 +205,7 @@ function Wait-JobWithProgress {
 
     if($PrintInterval -ge $MaxPrintInterval) {
       $totalSecs = [math]::Round($timer.Elapsed.TotalSeconds,0)
-      Write-Host "Passed: $totalSecs seconds, or $( [math]::Round($totalSecs / 60,1)) minutes, or $( [math]::Round($totalSecs / 60 / 60,1)) hours ..." -ForegroundColor Yellow
+      Write-Host "Remaining running Jobs $(($runningJobs | Measure-Object).Count): Time Passed: $totalSecs seconds, or $( [math]::Round($totalSecs / 60,1)) minutes, or $( [math]::Round($totalSecs / 60 / 60,1)) hours ..." -ForegroundColor Yellow
       $PrintInterval = 1
     } else {
       $PrintInterval += 1
