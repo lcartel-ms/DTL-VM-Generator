@@ -25,7 +25,7 @@ if ($tags) {
     Write-Host "---------------------------------" -ForegroundColor Green
     Write-Host "Tagging $configCount lab..." -ForegroundColor Green
     $jobs = $config | Add-AzDtlLabTags -tags $tags -tagLabsResourceGroup $tagLabsResourceGroup -AsJob
-    Wait-JobWithProgress -jobs $jobs -secTimeout 1200
+    Wait-JobWithProgress -jobs $jobs -secTimeout 3600
 }
 
 Remove-AzDtlModule                                       # Remove the DTL Library
