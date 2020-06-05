@@ -69,22 +69,6 @@ function PrintHashtable {
   return ($hash.Keys | ForEach-Object { "$_ $($hash[$_])" }) -join "|"
 }
 
-function ToArray
-{
-  begin
-  {
-    $output = @();
-  }
-  process
-  {
-    $output += $_;
-  }
-  end
-  {
-    return ,$output;
-  }
-}
-
 # Getting labs that don't exist shouldn't fail, but return empty for composibility
 # Also I am forced to do client side query because when you add -ExpandProperty to Get-AzureRmResource it disables wildcard?????
 # Also I know that treating each case separately is ugly looking, but there are various bugs that might be fixed in Get-AzureRmResource
