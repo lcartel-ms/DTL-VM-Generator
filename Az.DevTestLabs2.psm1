@@ -763,18 +763,18 @@ function Add-AzDtlLabTags {
         # Tag the resource group if the user wants
         if ($tagLabsResourceGroup) {
             $labrg = Get-AzureRmResourceGroup -Name $Lab.ResourceGroupName
-            Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $labrg, $true, $tags, $justAz
+            Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $labrg, $true, $tags, $AsJob
         }
 
         # Get the lab resource and tag it
         $labObj = Get-AzureRmResource -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs"
-        Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $labObj, $false, $tags, $justAz
+        Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $labObj, $false, $tags, $AsJob
 
         # Get the DTL VMs and tag them
         Get-AzureRmResource -ResourceGroupName $Lab.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs/VirtualMachines" | Where-Object {
             $_.Name.StartsWith($Lab.Name + "/")
         } | ForEach-Object {
-            Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $_, $false, $tags, $justAz
+            Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $_, $false, $tags, $AsJob
         }
 
         # Find all the resources associated with this lab (only proceed if we found the lab)
@@ -782,7 +782,7 @@ function Add-AzDtlLabTags {
             Get-AzureRmResource -TagName hidden-DevTestLabs-LabUId -TagValue $labObj.Properties.uniqueIdentifier `
                   | ForEach-Object {
 
-                      Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $_, $false, $tags, $justAz
+                      Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $_, $false, $tags, $AsJob
 
                       if ($_.ResourceType -eq 'Microsoft.Compute/virtualMachines') {
                          # We need to get the disks on the VM and tag those - disks from specialized images don't have a hidden tag
@@ -793,15 +793,15 @@ function Add-AzDtlLabTags {
                          if ($vm.ResourceGroupName -ne $labObj.ResourceGroupName) {
                             $vmRg = Get-AzureRmResourceGroup -Name $vm.ResourceGroupName
 
-                            Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $vmRg, $true, $tags, $justAz
+                            Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $vmRg, $true, $tags, $AsJob
                          }
 
                          # Add tags to the OS disk (VMs should always have an OS disk
-                         Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $vm.Properties.storageProfile.osDisk.managedDisk.id, $false, $tags, $justAz
+                         Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $vm.Properties.storageProfile.osDisk.managedDisk.id, $false, $tags, $AsJob
 
                          # Add Tags to the data disks
                          $vm.Properties.storageProfile.dataDisks | ForEach-Object {
-                         Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $_.managedDisk.id, $false, $tags, $justAz
+                         Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $_.managedDisk.id, $false, $tags, $AsJob
                       }
                   }
               }

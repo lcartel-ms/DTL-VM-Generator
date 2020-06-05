@@ -24,7 +24,7 @@ $configCount = ($config | Measure-Object).Count
 if ($tags) {
     Write-Host "---------------------------------" -ForegroundColor Green
     Write-Host "Tagging $configCount lab..." -ForegroundColor Green
-    $jobs = $config | Add-AzDtlLabTags -tags $tags -tagLabsResourceGroup $tagLabsResourceGroup -Verbose 
+    $jobs = $config | Add-AzDtlLabTags -tags $tags -tagLabsResourceGroup $tagLabsResourceGroup -AsJob
 
     # If there was nothing to tag, there won't be any jobs
     if ($jobs) {
