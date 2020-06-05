@@ -248,7 +248,7 @@ function DeployLab {
   $jsonPath = StringToFile($arm)
 
   $sb = {
-    param($deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz, $AsJob)
+    param($deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz)
 
     if($justAz) {
       Enable-AzureRmAlias -Scope Local -Verbose:$false
@@ -268,9 +268,9 @@ function DeployLab {
   }
 
   if($AsJob) {
-    Start-Job      -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz, $AsJob
+    Start-Job      -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz
   } else {
-    Invoke-Command -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz, $AsJob
+    Invoke-Command -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz
   }
 }
 
@@ -646,7 +646,7 @@ function Add-AzDtlLabTags {
     try{
 
       $sb = {
-        param($Lab, $tags, $justAz, $AsJob)
+        param($Lab, $tags, $justAz)
 
         function Unify-Tags {
             [CmdletBinding()]
@@ -750,9 +750,9 @@ function Add-AzDtlLabTags {
       }
 
       if($AsJob) {
-        Start-Job      -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz, $AsJob
+        Start-Job      -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz
       } else {
-        Invoke-Command -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz, $AsJob
+        Invoke-Command -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz
       }
 
     } 
@@ -1245,7 +1245,7 @@ function Start-AzDtlVm {
     try {
 
         $sb = {
-          param($vm, $justAz, $AsJob)
+          param($vm, $justAz)
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
@@ -1263,9 +1263,9 @@ function Start-AzDtlVm {
       foreach($v in $Vm) {
 
           if($AsJob.IsPresent) {
-            Start-Job      -ScriptBlock $sb -ArgumentList $v, $justAz, $AsJob
+            Start-Job      -ScriptBlock $sb -ArgumentList $v, $justAz
           } else {
-            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $justAz, $AsJob
+            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $justAz
           }
       }
     } catch {
@@ -1290,7 +1290,7 @@ function Stop-AzDtlVm {
   process {
     try {
         $sb = {
-          param($vm, $justAz, $AsJob)
+          param($vm, $justAz)
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
@@ -1309,9 +1309,9 @@ function Stop-AzDtlVm {
       foreach($v in $Vm) {
 
           if($AsJob.IsPresent) {
-            Start-Job      -ScriptBlock $sb -ArgumentList $v, $justAz, $AsJob
+            Start-Job      -ScriptBlock $sb -ArgumentList $v, $justAz
           } else {
-            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $justAz, $AsJob
+            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $justAz
           }
       }
     } catch {
@@ -1692,8 +1692,7 @@ function Set-AzDtlVmArtifact {
                 [string] $RepositoryName,
                 [string] $ArtifactName,
                 [array] $ArtifactParameters = @(),
-                $justAz,
-                $AsJob
+                $justAz
             )
 
             if($justAz) {
@@ -1761,9 +1760,9 @@ function Set-AzDtlVmArtifact {
 
       foreach($v in $Vm) {
           if($AsJob.IsPresent) {
-            Start-Job      -ScriptBlock $sb -ArgumentList $v, $RepositoryName, $ArtifactName, $artifactParameters, $justAz, $AsJob
+            Start-Job      -ScriptBlock $sb -ArgumentList $v, $RepositoryName, $ArtifactName, $artifactParameters, $justAz
           } else {
-            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $RepositoryName, $ArtifactName, $artifactParameters, $justAz, $AsJob
+            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $RepositoryName, $ArtifactName, $artifactParameters, $justAz
           }
       }
     } catch {
