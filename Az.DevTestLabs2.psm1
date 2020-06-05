@@ -638,6 +638,7 @@ function Add-AzDtlLabTags {
 
                 Enable-AzureRmAlias -Scope Local -Verbose:$false
                 # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
+                Start-Sleep -Seconds (Get-Random -Maximum 30)
                 $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
                 $Mutex.WaitOne() | Out-Null
                 $rg = Get-AzResourceGroup -Name "Temp" -ErrorAction SilentlyContinue | Out-Null
