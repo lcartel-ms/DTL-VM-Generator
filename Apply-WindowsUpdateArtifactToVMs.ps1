@@ -55,7 +55,7 @@ $config | ForEach-Object {
 
      # Apply artifacts to all the VMs, wait with status for 40 min
      $jobs = $vms | Set-AzDtlVmArtifact -RepositoryName "Public Repo" -ArtifactName "windows-install-windows-updates" -AsJob
-     Wait-JobWithProgress -jobs $jobs -secTimeout 7200
+     Wait-JobWithProgress -jobs $jobs -secTimeout 14400
 
      if ($shutdownVMs) {
          # next we shutdown all the VMs
