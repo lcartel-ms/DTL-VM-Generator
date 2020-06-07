@@ -18,11 +18,17 @@ if (Get-Module | Where-Object {$_.Name -eq "PoshRSJob"}) {
 }
 
 # DTL Module dependency
-$AzDtlModuleName = "Az.DevTestLabs2.psm1"
+$AzDtlModuleName = "Az.DevTestLabs2"
 $AzDtlModuleSource = "https://raw.githubusercontent.com/Azure/azure-devtestlab/master/samples/DevTestLabs/Modules/Library/Az.DevTestLabs2.psm1"
 
 # To be passed as 'ModulesToImport' param when starting a RSJob
 $global:AzDtlModulePath = Join-Path -Path (Resolve-Path ./) -ChildPath $AzDtlModuleName
+
+# PSipcalc script dependency
+$PSipcalcSource = "https://raw.githubusercontent.com/EliteLoser/PSipcalc/master/PSipcalc.ps1"
+$PSipcalcName = "PSipcalc.ps1"
+$PSipcalcScriptPath = Join-Path -Path (Resolve-Path ./) -ChildPath $PSipcalcName
+$PSipcalcAliasName = "Invoke-PSipcalc"
 
 function Import-RemoteModule {
   param(
@@ -46,12 +52,47 @@ function Import-RemoteModule {
   Import-Module $modulePath -Force
 }
 
+function Import-RemoteScript {
+  param(
+      [parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true, HelpMessage = "Web source of the psm1 file")]
+      [ValidateNotNullOrEmpty()]
+      [string] $Source,
+
+      [parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true, HelpMessage = "Web source of the psm1 file")]
+      [ValidateNotNullOrEmpty()]
+      [string] $ScriptName,
+      
+      [parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true, HelpMessage = "Name of the module")]
+      [ValidateNotNullOrEmpty()]
+      [string] $AliasName
+  )
+
+  $scriptPath = Join-Path -Path (Resolve-Path ./) -ChildPath $ScriptName
+
+  if (Test-Path -Path $scriptPath) {
+      Remove-Item -Path $scriptPath
+  }
+
+  $WebClient = New-Object System.Net.WebClient
+  $WebClient.DownloadFile($Source, $scriptPath)
+
+  New-Alias -Name $AliasName -Scope Script -Value $scriptPath -Force
+}
+
 function Import-AzDtlModule {
-   Import-RemoteModule -Source $AzDtlModuleSource -ModuleName $AzDtlModuleName
+   Import-RemoteModule -Source $AzDtlModuleSource -ModuleName "$AzDtlModuleName.psm1"
 }
 
 function Remove-AzDtlModule {
-   Remove-Module -Name "Az.DevTesTLabs2" -ErrorAction SilentlyContinue
+   Remove-Module -Name $AzDtlModuleName -ErrorAction SilentlyContinue
+}
+
+function Import-PsipcalcScript {
+  Import-RemoteScript -Source $PSipcalcSource -ScriptName $PSipcalcName -AliasName $PSipcalcAliasName 
+}
+
+function Remove-PsipcalcScript {
+  Remove-Item -Path $PSipcalcScriptPath
 }
 
 function Set-LabAccessControl {
@@ -101,6 +142,334 @@ function Set-LabAccessControl {
     else {
         Write-Host "Unable to add $useremail as $customRole in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
     }
+  }
+}
+
+filter Convert-IPToDecimal {
+  $IP = $_.Trim()
+  $IPv4Regex = "^((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])(\.(?!$)|$)){4}$"
+  if ($IP -match $IPv4Regex) {
+      try {
+          $str = ($IP.Split('.') | ForEach-Object { [System.Convert]::ToString([byte] $_, 2).PadLeft(8, '0') }) -join ''
+          return [Convert]::ToInt64($str, 2)
+      }
+      catch {
+          Write-Warning -Message "Error converting '$IP' to a binary string: $_"
+          return $null
+      }
+  }
+  else {
+      Write-Warning -Message "Invalid IP detected: '$IP'."
+      return $null
+  }
+}
+
+filter Convert-DecimalToIP {
+  
+  $IPDecimal = $_
+  $sb = [System.Text.StringBuilder]::new()
+  [void]$sb.Insert(0, ".$($IPDecimal -band 255)")
+  $IPDecimal = $IPDecimal -shr 8;
+  [void]$sb.Insert(0, ".$($IPDecimal -band 255)")
+  $IPDecimal = $IPDecimal -shr 8;
+  [void]$sb.Insert(0, ".$($IPDecimal -band 255)")
+  $IPDecimal = $IPDecimal -shr 8;
+  [void]$sb.Insert(0, "$($IPDecimal -band 255)")
+
+  return $sb.ToString()
+}
+
+function Get-CIDRNotationFromIPRange {
+  [CmdletBinding()]
+  param(    
+    [parameter(Mandatory=$true,HelpMessage="Start IPv4 in the address range")]
+    [ValidateNotNullOrEmpty()]
+    [string] $StartIP,
+
+    [parameter(Mandatory=$true,HelpMessage="End IPv4 in the address range")]
+    [ValidateNotNullOrEmpty()]
+    [string] $EndIP
+  )
+
+  # Implementation based on https://stackoverflow.com/questions/13508231/how-can-i-convert-ip-range-to-cidr-in-c
+
+  $startIPDecimal = $StartIP | Convert-IPToDecimal
+  $endIPDecimal = $EndIP | Convert-IPToDecimal
+
+  # Determine all bits that are different between the two IPs
+  $diffs = $startIPDecimal -bxor $endIPDecimal
+  $bits = 32
+  $mask = 0
+
+  while ($diffs -ne 0) {
+    #We keep shifting diffs right until it's zero (i.e. we've shifted all the non-zero bits off)
+    $diffs = $diffs -shr 1;
+
+    # Every time we shift, that's one fewer consecutive zero bits in the prefix
+    $bits--;
+
+    # Accumulate a mask which will have zeros in the consecutive zeros of the prefix and ones elsewhere
+    $mask = ($mask -shl 1) -bor 1;
+  }
+
+  # Construct the root of the range by inverting the mask and ANDing it with the start address
+  $root = $startIPDecimal -band (-not $endIPDecimal);
+
+  return "$($root -shr 24).$(($root -shr 16) -band 255).$(($root -shr 8) -band 255).$($root -band 255)/$bits"
+}
+
+# Get the first available Virtual Network subnet with a unassigned address space of at least /$Length
+function Get-VirtualNetworkUnassignedSpace {
+  [CmdletBinding()]
+  param(    
+    [parameter(Mandatory=$true,HelpMessage="Virtual Network to get the unassigned space from")]
+    [ValidateNotNullOrEmpty()]
+    $VirtualNetwork,
+
+    [parameter(Mandatory=$true,HelpMessage="Length of the required address space")]
+    [ValidateNotNullOrEmpty()]
+    [int] $Length
+  )
+
+  try {
+
+    Import-RemoteScript -Source $PSipcalcSource -ScriptName $PSipcalcName -AliasName $PSipcalcAliasName 
+
+    $vnetAddressRangeInfo = Invoke-PSipcalc -NetworkAddress $VirtualNetwork.AddressSpace.AddressPrefixes
+    $vnetAddressLength = $vnetAddressRangeInfo.NetworkLength
+    if ($vnetAddressLength -ge $Length) { # /26 , #/25 
+      throw "You must use a Vnet of at least /$($Length+1) or larger"
+    }
+
+    # Make sure to get the 'subnets/ipConfigurations' of the underlying VNet
+    $VirtualNetwork = Get-AzVirtualNetwork -ResourceGroupName $VirtualNetwork.ResourceGroupName -Name $VirtualNetwork.Name -ExpandResource 'subnets/ipConfigurations'
+
+    # Using a foreach to break the loop
+    foreach ($_ in $VirtualNetwork.Subnets  | `
+                    Sort-Object -Property AddressPrefix) {
+
+      # TODO check this is not a gateway subnet!
+
+      $vnetSubnet = $_
+
+      $subnetAddressRangeInfo = Invoke-PSipcalc -NetworkAddress $vnetSubnet.AddressPrefix
+      $subnetAddressLength = $vnetAddressRangeInfo.NetworkLength
+      
+      if ($subnetAddressLength -ge $Length) { # /26 , #/25 
+        # Subnet is not large enough
+        continue
+      }
+
+      $subnetAddressStart = $subnetAddressRangeInfo.NetworkAddress
+      $subnetAddressEnd = $subnetAddressRangeInfo.Broadcast
+
+      # Init to start of the subnet range
+      $lowestAssignedIp = $highestAssignedIp = $subnetAddressStart
+
+      $assignedIPs = $vnetSubnet.IpConfigurations | Select-Object -ExpandProperty PrivateIpAddress
+      if ($assignedIPs) {
+        $lowestAssignedIp = [Linq.Enumerable]::Min([string[]] $assignedIPs, [Func[string,int]] { param ($ip); $ip | Convert-IPToDecimal })
+        $highestAssignedIp = [Linq.Enumerable]::Max([string[]] $assignedIPs, [Func[string,int]] { param ($ip); $ip | Convert-IPToDecimal })
+      }
+     
+      $lowerHalfSubnetSpace = "$subnetAddressStart/$($subnetAddressLength+1)"
+      $upperHalfSubnetSpace = "$((($subnetAddressEnd | Convert-IPToDecimal) + 1) | Convert-DecimalToIp)/$($subnetAddressLength+1)"
+      
+      if ((Invoke-PSipcalc $lowerHalfSubnetSpace -Contains $lowestAssignedIp) -and `
+          (Invoke-PSipcalc $lowerHalfSubnetSpace -Contains $highestAssignedIp)) { # range in lowerhalf
+          
+        $assignedSubnetSpace = $lowerHalfSubnetSpace
+        $unassignedSubnetSpace = $upperHalfSubnetSpace
+
+        break
+      }
+      
+      if ((Invoke-PSipcalc $upperHalfSubnetSpace -Contains $lowestAssignedIp) -and `
+          (Invoke-PSipcalc $upperHalfSubnetSpace -Contains $highestAssignedIp)) { # range in upperhalf
+          
+        $assignedSubnetSpace = $upperHalfSubnetSpace
+        $unassignedSubnetSpace = $lowerHalfSubnetSpace
+
+        break
+      }
+    }
+
+    if ($null -eq $unassignedSubnetSpace -and $null -eq $assignedSubnetSpace) {
+      Write-Warning -Message "No subnet found with length of /$Length or larger"
+      return $null
+    }
+
+    $result = New-Object Object
+    $result | Add-member -Name 'VirtualNetworkSubnet' -Value $vnetSubnet -MemberType NoteProperty
+    $result | Add-member -Name 'UnassignedSubnetSpace' -Value $unassignedSubnetSpace -MemberType NoteProperty
+    $result | Add-member -Name 'AssignedSubnetSpace' -Value $assignedSubnetSpace -MemberType NoteProperty
+    
+    return $result
+  }
+  catch {
+    Write-Error -ErrorRecord $_
+  }
+  finally {
+    Remove-PsipcalcScript
+  }
+}
+
+function Get-VirtualNetworkUnallocatedSpace {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true,HelpMessage="Virtual Network to get the unassigned space from")]
+    [ValidateNotNullOrEmpty()]
+    $VirtualNetwork,
+
+    [parameter(Mandatory=$true,HelpMessage="Length of the required address space")]
+    [ValidateNotNullOrEmpty()]
+    [int] $Length
+  )
+
+  try {
+
+    Import-RemoteScript -Source $PSipcalcSource -ScriptName $PSipcalcName -AliasName $PSipcalcAliasName 
+
+    $vnetAddressRangeInfo = Invoke-PSipcalc -NetworkAddress $VirtualNetwork.AddressSpace.AddressPrefixes
+    $vnetAddressLength = $vnetAddressRangeInfo.NetworkLength
+    if ($vnetAddressLength -gt $Length) { # /26 , #/25 
+      throw "You must use a Vnet of at least /$($Length+1) or larger"
+    }
+
+    $vnetAddressStart = $vnetAddressRangeInfo.NetworkAddress
+    $nextVnetAddressStart = (($vnetAddressRangeInfo.Broadcast | Convert-IPToDecimal) + 1) | Convert-DecimalToIp 
+
+    $allocatedSubnetRanges = @{}
+    $allocatedSubnetRanges.Add($vnetAddressStart, $vnetAddressStart)
+    $allocatedSubnetRanges.Add($nextVnetAddressStart, $nextVnetAddressStart)
+
+    $vnetSubnetsByPrefix = $VirtualNetwork.Subnets  | `
+    Sort-Object -Property AddressPrefix
+
+    # Using a foreach to break the loop
+    foreach ($_ in $vnetSubnetsByPrefix) {
+
+      # TODO check this is not a gateway subnet!
+
+      $vnetSubnet = $_
+      # $currentIndex = $vnetSubnetsByPrefix.IndexOf($vnetSubnet)
+
+      $subnetAddressRangeInfo = Invoke-PSipcalc -NetworkAddress $vnetSubnet.AddressPrefix
+      $subnetAddressLength = $vnetAddressRangeInfo.NetworkLength
+      
+      if ($subnetAddressLength -gt $Length) { # /26 , #/25 
+        # Subnet is not large enough
+        continue
+      }
+
+      # [[10.0.0.0, 10.0.0.0], [10.0.4.0, 10.0.6.0], [10.0.7.0, 10.0.8.0], [10.0.8.0, 10.0.9.0], [10.1.0.0, 10.1.0.0]]
+      # TO ->
+      # [[10.0.0.0, 10.0.0.4], [10.0.6.0, 10.0.7.0], [10.0.9.0, 10.1.0.0]]
+
+      $subnetAddressStart = $subnetAddressRangeInfo.NetworkAddress
+      $nextSubnetAddressStart = (($subnetAddressRangeInfo.Broadcast | Convert-IPToDecimal) + 1) | Convert-DecimalToIp
+
+      if ($allocatedSubnetRanges[$subnetAddressStart]) {
+        # Replace existing with new end
+        $allocatedSubnetRanges[$subnetAddressStart] = $nextSubnetAddressStart
+      }
+      else {
+        $allocatedSubnetRanges.Add($subnetAddressStart, $nextSubnetAddressStart)
+      }
+    }
+
+    $unallocatedSubnetRanges = @()
+    $keys = [array]$allocatedSubnetRanges.Keys
+    $keys | ForEach-Object {
+
+      $nextSubnetAddressStart =  $allocatedSubnetRanges[$_]
+      $currentIndex = $keys.IndexOf($_)
+      
+      if ($currentIndex+1 -lt $allocatedSubnetRanges.Count) {
+        $nextNextSubnetAddressStart = $keys[$currentIndex+1]
+        
+        if ($nextSubnetAddressStart -ne $nextNextSubnetAddressStart) {
+          
+          $endIpRange = (($nextNextSubnetAddressStart | Convert-IPToDecimal) - 1) | Convert-DecimalToIp 
+          $addressRange = Get-CIDRNotationFromIPRange -StartIP $nextSubnetAddressStart -EndIP $endIpRange 
+          $unallocatedSubnetRanges.Add($addressRange)
+        }
+      }
+    }
+    
+    $unallocatedSubnetRanges | ForEach-Object {
+      
+      if ($unallocatedSubnetRanges.Split("/")[1] -ge $Length) {
+        return $_
+      }
+    }
+  }
+  catch {
+    Write-Error -ErrorRecord $_
+  }
+  finally {
+    Remove-PsipcalcScript
+  }
+}
+
+function New-BastionHost {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory=$true, HelpMessage="The Name of the DevTest Lab")]
+    [string] $DevTestLabName,
+
+    [Parameter(Mandatory=$true, HelpMessage="The Name of the resource group the lab is in")]
+    [string] $ResourceGroupName
+  )
+
+  try {
+    
+    $ErrorActionPreference = "Stop"
+    $lab = Get-AzDtlLab -ResourceGroupName $ResourceGroupName -Name $DevTestLabName
+    
+    # Check for underlying VNet subnets supporting VMs creation. If none is found, we cannot deploy a bastion.
+    $dtlVnets = $lab | Get-AzDtlVirtualNetworks | Where-Object {
+      $subnets = $_ | Get-AzDtlVirtualNetworkSubnets -SubnetKind 'UsedInVmCreation'
+      if ($subnets) {
+        return $_
+      }
+    }
+    if ($null -eq $dtlVnets -or ($dtlVnets -is [array] -and $dtlVnets.Count -ne 1)) {
+      throw "DevTest Labs currently supports deploying a Bastion in only one VNet enabled for VM creation."
+    }
+
+    $vnets = Get-AzVirtualNetwork -ResourceGroupName $dtlVnets.ResourceGroupName -Name $dtlVnets.Name
+
+    # Try to get an address range with lenght >= 27 (smallest supported by Bastion)
+    $bastionAddressSpace = Get-VirtualNetworkUnallocatedSpace -VirtualNetwork $vnets -Length 27
+    if (!($bastionAddressSpace)) {
+      Write-Host "No Address space left with length >= 27"
+      Write-Host "Trying to halve an existing subnet..."
+
+      # Logic for halving an existing subnet.
+      # TODO should we ask permission to the user?
+      $unassignedSpaceResult = Get-VirtualNetworkUnassignedSpace -VirtualNetwork $vnets -Length 27
+      if (!($unassignedSpaceResult)) {
+        throw "Not enough addresses available to deploy a Bastion. To proceed, expand the Virtual Network address range."
+      }
+
+      $resizingVirtualNetworkSubnet = $unassignedSpaceResult.VirtualNetworkSubnet
+      $assignedAddressSpace =  $unassignedSpaceResult.AssignedSubnetSpace
+      $bastionAddressSpace =  $unassignedSpaceResult.UnassignedSubnetSpace
+
+      $vnets.Subnets | ForEach-Object {
+        if ($_.Id -eq $resizingVirtualNetworkSubnet.Id) {
+          $_.AddressPrefix = $assignedAddressSpace
+        }
+      }
+
+      $vnets = Set-AzureRmVirtualNetwork -VirtualNetwork $vnets
+    }
+
+    $lab | New-AzDtlBastion -VirtualNetwork $vnets -BastionSubnetAddressPrefix $bastionAddressSpace
+  }
+  catch {
+    Write-Error -ErrorRecord $_
   }
 }
 
