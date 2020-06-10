@@ -1665,7 +1665,7 @@ function Get-AzDtlVirtualNetworkSubnets {
     $VirtualNetwork,
 
     [parameter(Mandatory=$false, HelpMessage="Filter by type of DevTestLab VNet")]
-    [ValidateSet('All','UsedInVmCreation')]
+    [ValidateSet('All','UsedInVmCreation','UsedInPublicIpAddress')]
     [string]
     $SubnetKind = 'All'
   )
@@ -1673,20 +1673,22 @@ function Get-AzDtlVirtualNetworkSubnets {
   begin {. BeginPreamble}
   process {
     try {
-      $Lab | ForEach-Object {
-        
-        $VirtualNetwork.Properties.subnetOverrides | Foreach-Object {
+        $VirtualNetwork | Foreach-Object {
+          $_.Properties.subnetOverrides | Foreach-Object {
 
-          if ($SubnetKind -eq 'UsedInVmCreation') {
-            if ($_.useInVmCreationPermission -eq "Allow") {
+            if ($SubnetKind -eq 'All') {
               Get-AzureRmResource -ResourceId $_.resourceId
             }
-          }
-          else {
-            Get-AzureRmResource -ResourceId $_.resourceId
+            else {
+              if ($SubnetKind -eq 'UsedInVmCreation' -and $_.useInVmCreationPermission -eq "Allow") {
+                Get-AzureRmResource -ResourceId $_.resourceId
+              }
+              elseif ($SubnetKind -eq 'UsedInPublicIpAddress' -and $_.usePublicIpAddressPermission -eq "Allow") {
+                Get-AzureRmResource -ResourceId $_.resourceId
+              }
+            }
           }
         }
-      }
     } catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
@@ -1699,12 +1701,13 @@ function New-AzDtlBastion {
     [parameter(Mandatory=$true,HelpMessage="Lab to deploy the Bastion host to.", ValueFromPipeline=$true)]
     [ValidateNotNullOrEmpty()]
     $Lab,
-    
-    [parameter(Mandatory=$true,HelpMessage="Virtual Network used in VM creation")]
-    [ValidateNotNullOrEmpty()]
-    $VirtualNetwork,
 
-    [parameter(Mandatory=$true,HelpMessage="IP addresses for the Bastion subnet configuration")]
+    [parameter(Mandatory=$false,HelpMessage="Id of the Virtual Network used in VM creation. If you are using an existing virtual network, make sure the existing virtual network has enough free address space to accommodate the Bastion subnet requirements. Defaults to the only VNet, if there is one.")]
+    [ValidateNotNullOrEmpty()]
+    [string]
+    $LabVirtualNetworkId = "",
+
+    [parameter(Mandatory=$true,HelpMessage="IP address prefix (CIDR notation) where to deploy the Bastion host")]
     [ValidateNotNullOrEmpty()]
     [string] $BastionSubnetAddressPrefix
   )
@@ -1714,53 +1717,71 @@ function New-AzDtlBastion {
     try {
 
       $CIDRIPv4Regex = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(3[0-2]|[1-2][0-9]|[0-9]))$"
-      if (!($BastionSubnetAddressPrefix -match $CIDRIPv4Regex)) {
+      if (!($AddressPrefix -match $CIDRIPv4Regex)) {
         throw "Not a valid CIDR IPv4 address range"
       }
 
-      if ($BastionSubnetAddressPrefix.Split("/")[1] -gt 27) {
-        throw "You must use a Vnet of at least /27 or larger"
+      if ($AddressPrefix.Split("/")[1] -gt 27) {
+        throw "You must use a subnet of at least /27 or larger (26,25...)"
       }
 
-      $Lab | ForEach-Object {
-
-        # Get again the lab in case Get-AzDtlLab was not used
-        $lab = $_ | Get-AzDtlLab
-
-        # Get the underlying VNet for this Lab
-        # $labVNet = Get-AzDtlVirtualNetworks -Lab $lab -ExpandedNetwork
-
-        # Try create a subnet in this address range
-        Add-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $VirtualNetwork -Name "AzureBastionSubnet" -AddressPrefix $BastionSubnetAddressPrefix
-        $VirtualNetwork = Set-AzureRmVirtualNetwork -VirtualNetwork $VirtualNetwork
-
-        # Ip has to be in the same region of Bastion
-        $bastionPublicIpAddress =
-                New-AzPublicIpAddress `
-                    -ResourceGroupName $lab.ResourceGroupName `
-                    -Name "$($lab.Name)PublicIP" `
-                    -Location $lab.Location `
-                    -AllocationMethod "Static" `
-                    -Sku "Standard"
-
-        New-AzBastion `
-            -ResourceGroupName $lab.ResourceGroupName `
-            -Name "$($lab.Name)Bastion" `
-            -PublicIpAddress $bastionPublicIpAddress `
-            -VirtualNetwork $VirtualNetwork
-
-        # Must set the browserConnect property to enabled using preview Api Version
-        $lab.Properties.browserConnect = "Enabled"
-
-        Set-AzureRmResource `
-          -ResourceId $lab.ResourceId `
-          -ApiVersion 2018-10-15-preview `
-          -Properties $lab.Properties `
-          -Force | Out-Null
-
-        $lab | Get-AzDtlLab
+      # Get again the lab in case Get-AzDtlLab was not used
+      $Lab = $Lab | Get-AzDtlLab
+      if ($LabVirtualNetworkId) {
+        $VirtualNetwork = Get-AzResource -ResourceId $LabVirtualNetworkId -ResourceType Microsoft.DevTestLab/labs/virtualnetworks
       }
-    } catch {
+      else {
+        $VirtualNetwork = $Lab | Get-AzDtlVirtualNetworks
+      }
+
+      # In the underlying Lab VNet, look for a subnet supporting VMs creation.
+      # If 0 or >1 VNet is found, we cannot deploy the Bastion
+      $VirtualNetwork = $VirtualNetwork | Where-Object {
+        $subnets = $_ | Get-AzDtlVirtualNetworkSubnets -SubnetKind 'UsedInVmCreation'
+        if ($subnets) {
+          return $_
+        }
+      }
+
+      # TODO If VNet > 1, we don't know which one to pick. Should we ask the user?
+      if ($null -eq $vnets -or ($vnets -is [array] -and $vnets.Count -ne 1)) {
+        throw "DevTest Labs currently supports deploying a Bastion in only 1 VNet enabled for VM creation."
+      }
+
+      # Make sure to get the underlying VNet for this Lab
+      $VirtualNetwork = $VirtualNetwork | Get-AzVirtualNetwork -ExpandResource
+
+      # Try create a subnet in this address range
+      Add-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $VirtualNetwork -Name "AzureBastionSubnet" -AddressPrefix $AddressPrefix
+      $VirtualNetwork = Set-AzureRmVirtualNetwork -VirtualNetwork $VirtualNetwork
+
+      # Ip has to be in the same region of Bastion
+      $bastionPublicIpAddress =
+              New-AzPublicIpAddress `
+                  -ResourceGroupName $lab.ResourceGroupName `
+                  -Name "$($lab.Name)PublicIP" `
+                  -Location $lab.Location `
+                  -AllocationMethod "Static" `
+                  -Sku "Standard"
+
+      New-AzBastion `
+          -ResourceGroupName $lab.ResourceGroupName `
+          -Name "$($lab.Name)Bastion" `
+          -PublicIpAddress $bastionPublicIpAddress `
+          -VirtualNetwork $VirtualNetwork
+
+      # Must set the browserConnect property to enabled using preview Api Version
+      $lab.Properties.browserConnect = "Enabled"
+
+      Set-AzureRmResource `
+        -ResourceId $lab.ResourceId `
+        -ApiVersion 2018-10-15-preview `
+        -Properties $lab.Properties `
+        -Force | Out-Null
+
+      $lab | Get-AzDtlLab
+    }
+    catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
   }

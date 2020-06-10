@@ -167,37 +167,40 @@ filter Convert-IPToDecimal {
 filter Convert-DecimalToIP {
   
   $IPDecimal = $_
-  $sb = [System.Text.StringBuilder]::new()
-  [void]$sb.Insert(0, ".$($IPDecimal -band 255)")
-  $IPDecimal = $IPDecimal -shr 8;
-  [void]$sb.Insert(0, ".$($IPDecimal -band 255)")
-  $IPDecimal = $IPDecimal -shr 8;
-  [void]$sb.Insert(0, ".$($IPDecimal -band 255)")
-  $IPDecimal = $IPDecimal -shr 8;
-  [void]$sb.Insert(0, "$($IPDecimal -band 255)")
+  # $sb = [System.Text.StringBuilder]::new()
 
-  return $sb.ToString()
+  # [void]$sb.Insert(0, ".$($IPDecimal -band 255)")
+  # $IPDecimal = $IPDecimal -shr 8;
+  # [void]$sb.Insert(0, ".$($IPDecimal -band 255)")
+  # $IPDecimal = $IPDecimal -shr 8;
+  # [void]$sb.Insert(0, ".$($IPDecimal -band 255)")
+  # $IPDecimal = $IPDecimal -shr 8;
+  # [void]$sb.Insert(0, "$($IPDecimal -band 255)")
+
+  # return $sb.ToString()
+
+  return "$($IPDecimal -shr 24).$(($IPDecimal -shr 16) -band 255).$(($IPDecimal -shr 8) -band 255).$($IPDecimal -band 255)"
 }
 
-function Get-CIDRNotationFromIPRange {
+function Convert-IPRangeToCIDRNotation {
   [CmdletBinding()]
   param(    
     [parameter(Mandatory=$true,HelpMessage="Start IPv4 in the address range")]
     [ValidateNotNullOrEmpty()]
-    [string] $StartIP,
+    [string] $Start,
 
     [parameter(Mandatory=$true,HelpMessage="End IPv4 in the address range")]
     [ValidateNotNullOrEmpty()]
-    [string] $EndIP
+    [string] $End
   )
 
   # Implementation based on https://stackoverflow.com/questions/13508231/how-can-i-convert-ip-range-to-cidr-in-c
 
-  $startIPDecimal = $StartIP | Convert-IPToDecimal
-  $endIPDecimal = $EndIP | Convert-IPToDecimal
+  $startDecimal = $Start | Convert-IPToDecimal
+  $endDecimal = $End | Convert-IPToDecimal
 
   # Determine all bits that are different between the two IPs
-  $diffs = $startIPDecimal -bxor $endIPDecimal
+  $diffs = $startDecimal -bxor $endDecimal
   $bits = 32
   $mask = 0
 
@@ -213,12 +216,127 @@ function Get-CIDRNotationFromIPRange {
   }
 
   # Construct the root of the range by inverting the mask and ANDing it with the start address
-  $root = $startIPDecimal -band (-not $endIPDecimal);
+  $root = $startDecimal -band (-bnot $mask);
 
   return "$($root -shr 24).$(($root -shr 16) -band 255).$(($root -shr 8) -band 255).$($root -band 255)/$bits"
 }
 
-# Get the first available Virtual Network subnet with a unassigned address space of at least /$Length
+
+# Get the first available unallocated address space which is large enough to host a new subnet of at least /$Length
+function Get-VirtualNetworkUnallocatedSpace {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true,HelpMessage="Virtual Network to get the unassigned space from")]
+    [ValidateNotNullOrEmpty()]
+    $VirtualNetwork,
+
+    [parameter(Mandatory=$true,HelpMessage="Length of the required address space")]
+    [ValidateNotNullOrEmpty()]
+    [int] $Length
+  )
+
+  try {
+
+    # Using Psipcal
+    Import-PsipcalcScript
+    
+    # Solution:
+    # Build a hashtable of starting and ending address ranges, ordered by start of address range
+    # On a second pass calculate the delta between i_end and i+1_start. If it is wide enough, that is the range to return
+    
+    # [[10.0.0.0, 10.0.0.0], [10.0.4.0, 10.0.6.0], [10.0.7.0, 10.0.8.0], [10.0.8.0, 10.0.9.0], [10.1.0.0, 10.1.0.0]]
+    # TO ->
+    # [[10.0.0.0, 10.0.0.4], [10.0.6.0, 10.0.7.0], [10.0.9.0, 10.1.0.0]]
+
+    # Edge cases.
+    # Start entry: [start_range, start_range] = [10.0.0.0, 10.0.0.0]
+    # End entry: [end_range, end_range] = [10.1.0.0, 10.1.0.0]
+    
+    # n log n runtime. Okay if it requires getting the first bottom slot available...
+    # n space. We can also break earlier without building the unallocated spaces table.
+    #          Leaving it here for other possible implementations.
+
+    # Ordered Hashtable for all the allocated subnet ranges
+    $allocatedSubnetRanges = @{}
+
+    # A VNet can have multiple address spaces assigned, even not contiguous
+    # E.g. 2 ranges: 10.0.0.0/24 | 10.0.8.0/24
+    $addressRanges = $VirtualNetwork.AddressSpace.AddressPrefixes | Sort-Object -Property AddressPrefix
+    $addressRanges | ForEach-Object {
+
+      $vnetAddressRangeInfo = Invoke-PSipcalc -NetworkAddress $_
+      $vnetAddressRangeLength = $vnetAddressRangeInfo.NetworkLength
+      if ($vnetAddressRangeLength -gt $Length) {
+        throw "You must use a Vnet of at least /$($Length+1) or larger"
+      }
+  
+      $vnetAddressRangeStart = $vnetAddressRangeInfo.NetworkAddress
+      $nextVnetAddressRangeStart = (($vnetAddressRangeInfo.Broadcast | Convert-IPToDecimal) + 1) | Convert-DecimalToIp 
+  
+      $allocatedSubnetRanges.Add($vnetAddressRangeStart, $vnetAddressRangeStart)
+      $allocatedSubnetRanges.Add($nextVnetAddressRangeStart, $nextVnetAddressRangeStart)
+  
+      $vnetSubnets = $VirtualNetwork.Subnets  | `
+                      Sort-Object -Property AddressPrefix
+      $vnetSubnets | Foreach-Object {
+  
+        $vnetSubnet = $_
+        $subnetAddressRangeInfo = Invoke-PSipcalc -NetworkAddress $vnetSubnet.AddressPrefix
+        $subnetAddressRangeLength = $subnetAddressRangeInfo.NetworkLength
+        
+        if ($subnetAddressRangeLength -gt $Length) {
+          # This subnet is not large enough to host a new subnet
+          continue
+        }
+  
+        $subnetAddressRangeStart = $subnetAddressRangeInfo.NetworkAddress
+        $nextsubnetAddressRangeStart = (($subnetAddressRangeInfo.Broadcast | Convert-IPToDecimal) + 1) | Convert-DecimalToIp
+  
+        if ($allocatedSubnetRanges[$subnetAddressRangeStart]) {
+          # Replace existing with the new range
+          $allocatedSubnetRanges[$subnetAddressRangeStart] = $nextsubnetAddressRangeStart
+        }
+        else {
+          $allocatedSubnetRanges.Add($subnetAddressRangeStart, $nextsubnetAddressRangeStart)
+        }
+      }
+    }
+
+    # Ordered Array of unallocated ranges (CIDR notation) calculated as a diff
+    $unallocatedSubnetRanges = [System.Collections.ArrayList]@()
+
+    $allocatedSubnetStarts = [array]$allocatedSubnetRanges.Keys
+    $allocatedSubnetStarts | ForEach-Object {
+
+      $index = $allocatedSubnetStarts.IndexOf($_)
+      $nextsubnetAddressRangeStart = $allocatedSubnetRanges[$_]
+      if ($index+1 -lt $allocatedSubnetRanges.Count) {
+
+        $nextNextsubnetAddressRangeStart = $allocatedSubnetStarts[$index+1]
+        if ($nextsubnetAddressRangeStart -ne $nextNextsubnetAddressRangeStart) {
+          
+          # Calculate the end IP of the allocated range
+          $nextsubnetAddressRangeEnd = (($nextNextsubnetAddressRangeStart | Convert-IPToDecimal) - 1) | Convert-DecimalToIp 
+          
+          $unallocatedAddressRange = Convert-IPRangeToCIDRNotation -Start $nextsubnetAddressRangeStart -End $nextsubnetAddressRangeEnd 
+          $unallocatedSubnetRanges.Add($unallocatedAddressRange)
+
+        } # else contiguous subnet
+      }
+    }
+    
+    # TODO deciding on the smallest (bottom) or shortest subnet
+    $unallocatedSubnetRanges | Select-Object -First 1
+  }
+  catch {
+    Write-Error -ErrorRecord $_
+  }
+  finally {
+    Remove-PsipcalcScript
+  }
+}
+
+# Get the first available subnet with a unassigned address space large enough to host a new subnet of at least /$Length
 function Get-VirtualNetworkUnassignedSpace {
   [CmdletBinding()]
   param(    
@@ -233,38 +351,36 @@ function Get-VirtualNetworkUnassignedSpace {
 
   try {
 
-    Import-RemoteScript -Source $PSipcalcSource -ScriptName $PSipcalcName -AliasName $PSipcalcAliasName 
+    # Using Psipcal
+    Import-PsipcalcScript
 
     $vnetAddressRangeInfo = Invoke-PSipcalc -NetworkAddress $VirtualNetwork.AddressSpace.AddressPrefixes
     $vnetAddressLength = $vnetAddressRangeInfo.NetworkLength
-    if ($vnetAddressLength -ge $Length) { # /26 , #/25 
+    if ($vnetAddressLength -ge $Length) {
       throw "You must use a Vnet of at least /$($Length+1) or larger"
     }
 
     # Make sure to get the 'subnets/ipConfigurations' of the underlying VNet
     $VirtualNetwork = Get-AzVirtualNetwork -ResourceGroupName $VirtualNetwork.ResourceGroupName -Name $VirtualNetwork.Name -ExpandResource 'subnets/ipConfigurations'
 
-    # Using a foreach to break the loop
+    # Using foreach instead of Foreach-Object to break execution of the loop without exiting the function
     foreach ($_ in $VirtualNetwork.Subnets  | `
                     Sort-Object -Property AddressPrefix) {
 
-      # TODO check this is not a gateway subnet!
-
       $vnetSubnet = $_
-
       $subnetAddressRangeInfo = Invoke-PSipcalc -NetworkAddress $vnetSubnet.AddressPrefix
-      $subnetAddressLength = $vnetAddressRangeInfo.NetworkLength
+      $subnetAddressRangeLength = $vnetAddressRangeInfo.NetworkLength
       
-      if ($subnetAddressLength -ge $Length) { # /26 , #/25 
-        # Subnet is not large enough
+      if ($subnetAddressRangeLength -ge $Length) {
+        # This subnet is not large enough to host a new subnet
         continue
       }
 
-      $subnetAddressStart = $subnetAddressRangeInfo.NetworkAddress
-      $subnetAddressEnd = $subnetAddressRangeInfo.Broadcast
+      $subnetAddressRangeStart = $subnetAddressRangeInfo.NetworkAddress
+      $subnetAddressRangeEnd = $subnetAddressRangeInfo.Broadcast
 
-      # Init to start of the subnet range
-      $lowestAssignedIp = $highestAssignedIp = $subnetAddressStart
+      # Init the lower and upper bounds to subnetAddressRangeStart
+      $lowestAssignedIp = $highestAssignedIp = $subnetAddressRangeStart
 
       $assignedIPs = $vnetSubnet.IpConfigurations | Select-Object -ExpandProperty PrivateIpAddress
       if ($assignedIPs) {
@@ -272,12 +388,13 @@ function Get-VirtualNetworkUnassignedSpace {
         $highestAssignedIp = [Linq.Enumerable]::Max([string[]] $assignedIPs, [Func[string,int]] { param ($ip); $ip | Convert-IPToDecimal })
       }
      
-      $lowerHalfSubnetSpace = "$subnetAddressStart/$($subnetAddressLength+1)"
-      $upperHalfSubnetSpace = "$((($subnetAddressEnd | Convert-IPToDecimal) + 1) | Convert-DecimalToIp)/$($subnetAddressLength+1)"
+      $lowerHalfSubnetSpace = "$subnetAddressRangeStart/$($subnetAddressRangeLength+1)"
+      $upperHalfSubnetSpace = "$((($subnetAddressRangeEnd | Convert-IPToDecimal) + 1) | Convert-DecimalToIp)/$($subnetAddressRangeLength+1)"
       
       if ((Invoke-PSipcalc $lowerHalfSubnetSpace -Contains $lowestAssignedIp) -and `
-          (Invoke-PSipcalc $lowerHalfSubnetSpace -Contains $highestAssignedIp)) { # range in lowerhalf
+          (Invoke-PSipcalc $lowerHalfSubnetSpace -Contains $highestAssignedIp)) {
           
+        # Range is contained in the lower half of the address space
         $assignedSubnetSpace = $lowerHalfSubnetSpace
         $unassignedSubnetSpace = $upperHalfSubnetSpace
 
@@ -287,6 +404,7 @@ function Get-VirtualNetworkUnassignedSpace {
       if ((Invoke-PSipcalc $upperHalfSubnetSpace -Contains $lowestAssignedIp) -and `
           (Invoke-PSipcalc $upperHalfSubnetSpace -Contains $highestAssignedIp)) { # range in upperhalf
           
+        # Range is contained in the upper half of the address space
         $assignedSubnetSpace = $upperHalfSubnetSpace
         $unassignedSubnetSpace = $lowerHalfSubnetSpace
 
@@ -304,105 +422,7 @@ function Get-VirtualNetworkUnassignedSpace {
     $result | Add-member -Name 'UnassignedSubnetSpace' -Value $unassignedSubnetSpace -MemberType NoteProperty
     $result | Add-member -Name 'AssignedSubnetSpace' -Value $assignedSubnetSpace -MemberType NoteProperty
     
-    return $result
-  }
-  catch {
-    Write-Error -ErrorRecord $_
-  }
-  finally {
-    Remove-PsipcalcScript
-  }
-}
-
-function Get-VirtualNetworkUnallocatedSpace {
-  [CmdletBinding()]
-  param(
-    [parameter(Mandatory=$true,HelpMessage="Virtual Network to get the unassigned space from")]
-    [ValidateNotNullOrEmpty()]
-    $VirtualNetwork,
-
-    [parameter(Mandatory=$true,HelpMessage="Length of the required address space")]
-    [ValidateNotNullOrEmpty()]
-    [int] $Length
-  )
-
-  try {
-
-    Import-RemoteScript -Source $PSipcalcSource -ScriptName $PSipcalcName -AliasName $PSipcalcAliasName 
-
-    $vnetAddressRangeInfo = Invoke-PSipcalc -NetworkAddress $VirtualNetwork.AddressSpace.AddressPrefixes
-    $vnetAddressLength = $vnetAddressRangeInfo.NetworkLength
-    if ($vnetAddressLength -gt $Length) { # /26 , #/25 
-      throw "You must use a Vnet of at least /$($Length+1) or larger"
-    }
-
-    $vnetAddressStart = $vnetAddressRangeInfo.NetworkAddress
-    $nextVnetAddressStart = (($vnetAddressRangeInfo.Broadcast | Convert-IPToDecimal) + 1) | Convert-DecimalToIp 
-
-    $allocatedSubnetRanges = @{}
-    $allocatedSubnetRanges.Add($vnetAddressStart, $vnetAddressStart)
-    $allocatedSubnetRanges.Add($nextVnetAddressStart, $nextVnetAddressStart)
-
-    $vnetSubnetsByPrefix = $VirtualNetwork.Subnets  | `
-    Sort-Object -Property AddressPrefix
-
-    # Using a foreach to break the loop
-    foreach ($_ in $vnetSubnetsByPrefix) {
-
-      # TODO check this is not a gateway subnet!
-
-      $vnetSubnet = $_
-      # $currentIndex = $vnetSubnetsByPrefix.IndexOf($vnetSubnet)
-
-      $subnetAddressRangeInfo = Invoke-PSipcalc -NetworkAddress $vnetSubnet.AddressPrefix
-      $subnetAddressLength = $vnetAddressRangeInfo.NetworkLength
-      
-      if ($subnetAddressLength -gt $Length) { # /26 , #/25 
-        # Subnet is not large enough
-        continue
-      }
-
-      # [[10.0.0.0, 10.0.0.0], [10.0.4.0, 10.0.6.0], [10.0.7.0, 10.0.8.0], [10.0.8.0, 10.0.9.0], [10.1.0.0, 10.1.0.0]]
-      # TO ->
-      # [[10.0.0.0, 10.0.0.4], [10.0.6.0, 10.0.7.0], [10.0.9.0, 10.1.0.0]]
-
-      $subnetAddressStart = $subnetAddressRangeInfo.NetworkAddress
-      $nextSubnetAddressStart = (($subnetAddressRangeInfo.Broadcast | Convert-IPToDecimal) + 1) | Convert-DecimalToIp
-
-      if ($allocatedSubnetRanges[$subnetAddressStart]) {
-        # Replace existing with new end
-        $allocatedSubnetRanges[$subnetAddressStart] = $nextSubnetAddressStart
-      }
-      else {
-        $allocatedSubnetRanges.Add($subnetAddressStart, $nextSubnetAddressStart)
-      }
-    }
-
-    $unallocatedSubnetRanges = @()
-    $keys = [array]$allocatedSubnetRanges.Keys
-    $keys | ForEach-Object {
-
-      $nextSubnetAddressStart =  $allocatedSubnetRanges[$_]
-      $currentIndex = $keys.IndexOf($_)
-      
-      if ($currentIndex+1 -lt $allocatedSubnetRanges.Count) {
-        $nextNextSubnetAddressStart = $keys[$currentIndex+1]
-        
-        if ($nextSubnetAddressStart -ne $nextNextSubnetAddressStart) {
-          
-          $endIpRange = (($nextNextSubnetAddressStart | Convert-IPToDecimal) - 1) | Convert-DecimalToIp 
-          $addressRange = Get-CIDRNotationFromIPRange -StartIP $nextSubnetAddressStart -EndIP $endIpRange 
-          $unallocatedSubnetRanges.Add($addressRange)
-        }
-      }
-    }
-    
-    $unallocatedSubnetRanges | ForEach-Object {
-      
-      if ($unallocatedSubnetRanges.Split("/")[1] -ge $Length) {
-        return $_
-      }
-    }
+    $result
   }
   catch {
     Write-Error -ErrorRecord $_
@@ -424,49 +444,37 @@ function New-BastionHost {
 
   try {
     
-    $ErrorActionPreference = "Stop"
     $lab = Get-AzDtlLab -ResourceGroupName $ResourceGroupName -Name $DevTestLabName
-    
-    # Check for underlying VNet subnets supporting VMs creation. If none is found, we cannot deploy a bastion.
-    $dtlVnets = $lab | Get-AzDtlVirtualNetworks | Where-Object {
-      $subnets = $_ | Get-AzDtlVirtualNetworkSubnets -SubnetKind 'UsedInVmCreation'
-      if ($subnets) {
-        return $_
-      }
-    }
-    if ($null -eq $dtlVnets -or ($dtlVnets -is [array] -and $dtlVnets.Count -ne 1)) {
-      throw "DevTest Labs currently supports deploying a Bastion in only one VNet enabled for VM creation."
-    }
-
-    $vnets = Get-AzVirtualNetwork -ResourceGroupName $dtlVnets.ResourceGroupName -Name $dtlVnets.Name
+    $vnets = $lab | Get-AzDtlVirtualNetworks -ExpandedNetwork
 
     # Try to get an address range with lenght >= 27 (smallest supported by Bastion)
     $bastionAddressSpace = Get-VirtualNetworkUnallocatedSpace -VirtualNetwork $vnets -Length 27
     if (!($bastionAddressSpace)) {
-      Write-Host "No Address space left with length >= 27"
+      Write-Host "No address space to deploy a Bastion subnet of length 27"
       Write-Host "Trying to halve an existing subnet..."
 
       # Logic for halving an existing subnet.
       # TODO should we ask permission to the user?
-      $unassignedSpaceResult = Get-VirtualNetworkUnassignedSpace -VirtualNetwork $vnets -Length 27
-      if (!($unassignedSpaceResult)) {
-        throw "Not enough addresses available to deploy a Bastion. To proceed, expand the Virtual Network address range."
+      $vnetUnassignedSpace = Get-VirtualNetworkUnassignedSpace -VirtualNetwork $vnets -Length 27
+      if (!($vnetUnassignedSpace)) {
+        throw "No address space or subnet to deploy a Bastion host. To proceed, please expand the Virtual Network address range."
       }
 
-      $resizingVirtualNetworkSubnet = $unassignedSpaceResult.VirtualNetworkSubnet
-      $assignedAddressSpace =  $unassignedSpaceResult.AssignedSubnetSpace
-      $bastionAddressSpace =  $unassignedSpaceResult.UnassignedSubnetSpace
+      $resizingVirtualNetworkSubnet = $vnetUnassignedSpace.VirtualNetworkSubnet
+      $assignedAddressSpace = $vnetUnassignedSpace.AssignedSubnetSpace
+      $bastionAddressSpace = $vnetUnassignedSpace.UnassignedSubnetSpace
 
+      # Update the VirtualNetwork object with a shrinked subnet
       $vnets.Subnets | ForEach-Object {
         if ($_.Id -eq $resizingVirtualNetworkSubnet.Id) {
           $_.AddressPrefix = $assignedAddressSpace
         }
       }
-
       $vnets = Set-AzureRmVirtualNetwork -VirtualNetwork $vnets
     }
 
-    $lab | New-AzDtlBastion -VirtualNetwork $vnets -BastionSubnetAddressPrefix $bastionAddressSpace
+    # Shared step
+    $lab | New-AzDtlBastion -LabVirtualNetworkId $vnets.Id -BastionSubnetAddressPrefix $bastionAddressSpace
   }
   catch {
     Write-Error -ErrorRecord $_
