@@ -20,6 +20,9 @@ param
     [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
     [string] $StorageAccountKey,
 
+    [parameter(Mandatory=$true, HelpMessage="Public=separate IP Address, Shared=load balancers optimizes IP Addresses, Private=No public IP address.")]
+    [string] $LabIpConfig,
+
     [Parameter(HelpMessage="String containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
     [string] $ImagePattern = "",
 
@@ -33,6 +36,12 @@ param
 )
 
 $ErrorActionPreference = "Stop"
+
+# Workaround for https://github.com/Azure/azure-powershell/issues/9448
+$Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+$Mutex.WaitOne() | Out-Null
+$rg = Get-AzResourceGroup | Out-Null
+$Mutex.ReleaseMutex() | Out-Null
 
 . "./Utils.ps1"
 
@@ -58,8 +67,8 @@ if(-not $toCreate) {
 Write-Host "Creating ... $toCreate"
 
 & "./Import-CustomImage.ps1" -VmSettings $toCreate -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
-& "./Set-Vm.ps1" -VmSettings $toCreate -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -IfExist $IfExist
+& "./Set-Vm.ps1" -VmSettings $toCreate -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -LabIpConfig $LabIpConfig -IfExist $IfExist
 & "./Remove-SnapshotsForLab.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
-& "./Set-Network.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VmSettings $toCreate
+& "./Set-Network.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VMsToConfigure $selected -VmSettings $VmSettings
 
 return "Creation seemed to have worked fine for $DevTestLabName"

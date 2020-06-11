@@ -51,11 +51,6 @@ function Import-AzDtlModule {
 }
 
 function Remove-AzDtlModule {
-   # WORKAROUND:  Delete the azure context that we saved to disk
-   if (Test-Path (Join-Path $env:TEMP "AzContext.json")) {
-     Remove-Item (Join-Path $env:TEMP "AzContext.json") -Force
-   }
-
    Remove-Module -Name "Az.DevTesTLabs2" -ErrorAction SilentlyContinue
 }
 
@@ -84,7 +79,7 @@ function Set-LabAccessControl {
         Write-Host "$owneremail added as Owner in Lab '$DevTestLabName'"
     }
     else {
-        Write-Host "Unable to add $owneremail as Owner in Lab '$DevTestLabName', cannot find the user in AAD" -ForegroundColor Yellow
+        Write-Host "Unable to add $owneremail as Owner in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
     }
   }
 
@@ -104,7 +99,7 @@ function Set-LabAccessControl {
         Write-Host "$useremail added as $customRole in Lab '$DevTestLabName'"
     }
     else {
-        Write-Host "Unable to add $useremail as $customRole in Lab '$DevTestLabName', cannot find the user in AAD" -ForegroundColor Yellow
+        Write-Host "Unable to add $useremail as $customRole in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
     }
   }
 }
@@ -182,7 +177,7 @@ function Wait-JobWithProgress {
     $secTimeout
     )
 
-  Write-Host "Waiting for results at most $secTimeout seconds, or $( [math]::Round($secTimeout / 60,1)) minutes, or $( [math]::Round($secTimeout / 60 / 60,1)) hours ..."
+  Write-Host "Waiting for $(($jobs | Measure-Object).Count) job results at most $secTimeout seconds, or $( [math]::Round($secTimeout / 60,1)) minutes, or $( [math]::Round($secTimeout / 60 / 60,1)) hours ..."
 
   if(-not $jobs) {
     Write-Host "No jobs to wait for"
@@ -210,7 +205,7 @@ function Wait-JobWithProgress {
 
     if($PrintInterval -ge $MaxPrintInterval) {
       $totalSecs = [math]::Round($timer.Elapsed.TotalSeconds,0)
-      Write-Host "Passed: $totalSecs seconds, or $( [math]::Round($totalSecs / 60,1)) minutes, or $( [math]::Round($totalSecs / 60 / 60,1)) hours ..." -ForegroundColor Yellow
+      Write-Host "Remaining running Jobs $(($runningJobs | Measure-Object).Count): Time Passed: $totalSecs seconds, or $( [math]::Round($totalSecs / 60,1)) minutes, or $( [math]::Round($totalSecs / 60 / 60,1)) hours ..." -ForegroundColor Yellow
       $PrintInterval = 1
     } else {
       $PrintInterval += 1
@@ -264,6 +259,11 @@ function Import-ConfigFile {
 
   $config | ForEach-Object {
     $lab = $_
+
+    # Confirm that the IpConfig is one of 3 options:
+    if ($lab.IpConfig -ne "Public" -and $lab.IpConfig -ne "Shared" -and $lab.Ipconfig -ne "Private") {
+        Write-Error "IpConfig either missing or incorrect for lab $($lab.DevTestLabName).  Must be 'Public', 'Private', or 'Shared'"
+    }
 
     # Also add "Name" since that's used by the DTL Library for DevTestLabName
     Add-Member -InputObject $lab -MemberType NoteProperty -Name "Name" -Value $lab.DevTestLabName
@@ -426,6 +426,7 @@ function Invoke-RSForEachLab {
       LabRegion='$($lab.LabRegion)';
       LabOwners= @($ownStr);
       LabUsers= @($userStr);
+      LabIpConfig='$($lab.IpConfig)';
       CustomRole='$($customRole)';
       ImagePattern='$($ImagePattern)';
       IfExist='$($IfExist)';

@@ -3,7 +3,6 @@ param
     [Parameter(Mandatory=$false, HelpMessage="Configuration File, see example in directory")]
     [ValidateNotNullOrEmpty()]
     [string] $ConfigFile = "config.csv",
-
     
     [Parameter(Mandatory=$false, HelpMessage="How many seconds to wait before starting the next parallel lab creation")]
     [int] $SecondsBetweenLoop =  10,
@@ -11,7 +10,6 @@ param
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="Custom Role to add users to")]
     [string] $CustomRole =  "No VM Creation User"
-
 )
 
 $ErrorActionPreference = "Stop"
@@ -43,12 +41,17 @@ $labCreateJobs = $config | ForEach-Object {
                            }
 Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
 
-
 # Update the shutdown policy on the labs
 Write-Host "---------------------------------" -ForegroundColor Green
 Write-Host "Updating $configCount labs with correct shutdown policy..." -ForegroundColor Green
 Wait-JobWithProgress -jobs ($config | Set-AzDtlLabShutdown -AsJob) -secTimeout 300
 
+# Update the IP Policy on the labs
+Write-Host "---------------------------------" -ForegroundColor Green
+Write-Host "Updating $configCount labs with IP Policy ..." -ForegroundColor Green
+$config | ForEach-Object {
+    Set-AzDtlLabIpPolicy -Lab $_ -IpConfig $_.IpConfig
+}
 
 # Add appropriate owner/user permissions for the labs
 Write-Host "---------------------------------" -ForegroundColor Green

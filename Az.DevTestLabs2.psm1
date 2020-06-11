@@ -26,19 +26,14 @@ if($justAzureRm) {
     Write-Error "This module does not work correctly with version 5 or lower of AzureRM, please upgrade to a newer version of Azure PowerShell in order to use this module."
   } else {
     # This is not defaulted in older versions of AzureRM
-
-    # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-    Save-AzContext -Path (Join-Path $env:TEMP "AzContext.json") -Force | Out-Null    # Save the context (WORKAROUND)
-    Disable-AzContextAutosave -Scope Process | Out-Null
+    Enable-AzContextAutosave -Scope Process | Out-Null
     Write-Warning "You are using the deprecated AzureRM module. For more info, read https://docs.microsoft.com/en-us/powershell/azure/migrate-from-azurerm-to-az"
   }
 }
 
 if($justAz) {
   Enable-AzureRmAlias -Scope Local
-  # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-  Save-AzContext -Path (Join-Path $env:TEMP "AzContext.json") -Force | Out-Null    # Save the context (WORKAROUND)
-  Disable-AzContextAutosave -Scope Process | Out-Null
+  Enable-AzContextAutosave -Scope Process | Out-Null
 }
 
 # We want to track usage of library, so adding GUID to user-agent at loading and removig it at unloading
@@ -242,9 +237,12 @@ function DeployLab {
     if($justAz) {
       Enable-AzureRmAlias -Scope Local -Verbose:$false
 
-      # WORKAROUND
-      Disable-AzContextAutosave -Scope Process | Out-Null
-      Import-AzContext -Path (Join-Path $env:TEMP "AzContext.json") | Out-Null
+      # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
+      $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+      $Mutex.WaitOne() | Out-Null
+      Enable-AzContextAutosave -Scope Process | Out-Null
+      $rg = Get-AzResourceGroup | Out-Null
+      $Mutex.ReleaseMutex() | Out-Null
     }
     
     $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -TemplateParameterObject $Parameters
@@ -305,7 +303,12 @@ function DeployVm {
     param($deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz)
 
     if($justAz) {
-      Enable-AzureRmAlias -Scope Local -Verbose:$false
+      # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
+      $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+      $Mutex.WaitOne() | Out-Null
+      Enable-AzContextAutosave -Scope Process | Out-Null
+      $rg = Get-AzResourceGroup | Out-Null
+      $Mutex.ReleaseMutex() | Out-Null
     }
     $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -TemplateParameterObject $Parameters
     Write-debug "Deployment succeded with deployment of `n$deployment"
@@ -627,83 +630,159 @@ function Add-AzDtlLabTags {
   process {
     try{
 
-      $sb = {
-        param($Lab, $tags, $justAz)
+        $StartJobIfNeeded = {
+            param($Resource, $IsResourceGroup, $tags, $AsJob)
 
-        function Unify-Tags {
-            [CmdletBinding()]
-            param(
-                [Parameter(Mandatory=$true)]
-                [AllowNull()]
-                [hashtable] $destinationTagList,
+            $tagSb = {
+                param($Resource, $IsResourceGroup, $newTags, $justAz)
 
-                [Parameter(Mandatory=$true)]
-                [AllowNull()]
-                [hashtable] $sourceTagList
-            )
+                Enable-AzureRmAlias -Scope Local -Verbose:$false
+                # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
+                Start-Sleep -Seconds (Get-Random -Maximum 30)
+                $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+                $Mutex.WaitOne() | Out-Null
+                $rg = Get-AzResourceGroup -Name "Temp" -ErrorAction SilentlyContinue | Out-Null
+                $Mutex.ReleaseMutex() | Out-Null
 
-            # if the destination doesn't have any tags, just apply the whole set of tags from the source
-            if ($destinationTagList -eq $null) {
-                if ($sourceTagList -ne $null) {
-                    $finalTagList = $sourceTagList.Clone()
+                if ($IsResourceGroup) {
+                    # Apply the unified tags back to Azure
+                    Set-AzureRmResourceGroup -Id $Resource.ResourceId -Tag $newTags | Out-Null
                 }
                 else {
-                    $finalTagList = $null
+                    # Apply the unified tags back to Azure
+                    Set-AzureRmResource -ResourceId $Resource.ResourceId -Tag $newTags -Force | Out-Null
                 }
+                return
             }
-            else {
-                # The destination list has tags, let's compare each one to make sure none are missing
-                $finalTagList = $destinationTagList.Clone()
+                    
+            function Unify-Tags {
+                [CmdletBinding()]
+                param(
+                    [Parameter(Mandatory=$true)]
+                    [AllowNull()]
+                    [hashtable] $destinationTagList,
 
-                # If the source list of tags isn't null, lets merge the tags in
-                if ($sourceTagList -ne $null) {
-                    foreach ($sourceTag in $sourceTagList.GetEnumerator()) {
-                        # Does the dest contain the Tag?
-                        if ($finalTagList.Contains($sourceTag.Name)) {
-                            # If there's a tag with the same name and the value is different we should fix it
-                            if ($finalTagList[$sourceTag.Name] -ne $sourceTag.Value) {
-                                $finalTagList[$sourceTag.Name] = $sourceTag.Value
+                    [Parameter(Mandatory=$true)]
+                    [AllowNull()]
+                    [hashtable] $sourceTagList
+                )
+
+                # if the destination doesn't have any tags, just apply the whole set of tags from the source
+                if ($destinationTagList -eq $null) {
+                    if ($sourceTagList -ne $null) {
+                        $finalTagList = $sourceTagList.Clone()
+                    }
+                    else {
+                        $finalTagList = $null
+                    }
+                }
+                else {
+                    # The destination list has tags, let's compare each one to make sure none are missing
+                    $finalTagList = $destinationTagList.Clone()
+
+                    # If the source list of tags isn't null, lets merge the tags in
+                    if ($sourceTagList -ne $null) {
+                        foreach ($sourceTag in $sourceTagList.GetEnumerator()) {
+                            # Does the dest contain the Tag?
+                            if ($finalTagList.Contains($sourceTag.Name)) {
+                                # If there's a tag with the same name and the value is different we should fix it
+                                if ($finalTagList[$sourceTag.Name] -ne $sourceTag.Value) {
+                                    $finalTagList[$sourceTag.Name] = $sourceTag.Value
+                                }
                             }
-                        }
-                        else {
-                            # destination doesn't contain the tag, let's add it
-                            $finalTagList.Add($sourceTag.Name, $sourceTag.Value)
+                            else {
+                                # destination doesn't contain the tag, let's add it
+                                $finalTagList.Add($sourceTag.Name, $sourceTag.Value)
+                            }
                         }
                     }
                 }
+                $finalTagList
             }
-            $finalTagList
+
+            # From here: https://gist.github.com/dbroeglin/c6ce3e4639979fa250cf
+            function Compare-Hashtable {
+            [CmdletBinding()]
+                param (
+                    [Parameter(Mandatory = $true)]
+                    [Hashtable]$Left,
+
+                    [Parameter(Mandatory = $true)]
+                    [Hashtable]$Right		
+	            )
+	
+	            function New-Result($Key, $LValue, $Side, $RValue) {
+		            New-Object -Type PSObject -Property @{
+					            key    = $Key
+					            lvalue = $LValue
+					            rvalue = $RValue
+					            side   = $Side
+			            }
+	            }
+	            [Object[]]$Results = $Left.Keys | % {
+		            if ($Left.ContainsKey($_) -and !$Right.ContainsKey($_)) {
+			            New-Result $_ $Left[$_] "<=" $Null
+		            } else {
+			            $LValue, $RValue = $Left[$_], $Right[$_]
+			            if ($LValue -ne $RValue) {
+				            New-Result $_ $LValue "!=" $RValue
+			            }
+		            }
+	            }
+	            $Results += $Right.Keys | % {
+		            if (!$Left.ContainsKey($_) -and $Right.ContainsKey($_)) {
+			            New-Result $_ $Null "=>" $Right[$_]
+		            } 
+	            }
+	            $Results 
+            }
+
+            # If we have only the resource Id, let's get the full object
+            if ($Resource.GetType().Name -eq "String" -and $IsResourceGroup -eq $true) {
+                $Resource = Get-AzureRmResourceGroup -Id $Resource
+            }
+            if ($Resource.GetType().Name -eq "String" -and $IsResourceGroup -eq $false) {
+                $Resource = Get-AzureRmResource -ResourceId $Resource
+            }
+
+            # Check to see if the resource already has all the tags
+            $newTags = (Unify-Tags $Resource.Tags $tags)
+            if (Compare-Hashtable -Left $Resource.Tags -Right $newTags) {
+
+                if($AsJob) {
+                    Start-Job      -ScriptBlock $tagSb -ArgumentList $Resource, $IsResourceGroup, $newTags, $justAz
+                } else {
+                    Invoke-Command -ScriptBlock $tagSb -ArgumentList $Resource, $IsResourceGroup, $newTags, $justAz
+                }
+            }
+            else {
+                Write-Verbose "Tags are the same, can skip for ResourceId $($Resource.ResourceId)!"
+            }
         }
 
-        if($justAz) {
-          Enable-AzureRmAlias -Scope Local -Verbose:$false
-
-          # WORKAROUND
-          Disable-AzContextAutosave -Scope Process | Out-Null
-          Import-AzContext -Path (Join-Path $env:TEMP "AzContext.json") | Out-Null
-        }
-
+        # Tag the resource group if the user wants
         if ($tagLabsResourceGroup) {
             $labrg = Get-AzureRmResourceGroup -Name $Lab.ResourceGroupName
-            Set-AzureRmResourceGroup -Name $lab.ResourceGroupName -Tag (Unify-Tags $labrg.Tags $tags) | Out-Null
+            Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $labrg, $true, $tags, $AsJob
         }
 
         # Get the lab resource and tag it
         $labObj = Get-AzureRmResource -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs"
-        Set-AzureRmResource -ResourceId $labObj.ResourceId -Tag (Unify-Tags $labObj.Tags $tags) -Force | Out-Null
+        Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $labObj, $false, $tags, $AsJob
 
         # Get the DTL VMs and tag them
         Get-AzureRmResource -ResourceGroupName $Lab.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs/VirtualMachines" | Where-Object {
             $_.Name.StartsWith($Lab.Name + "/")
         } | ForEach-Object {
-            Set-AzureRmResource -ResourceId $_.ResourceId -Tag (Unify-Tags $_.Tags $tags) -FOrce | Out-Null
+            Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $_, $false, $tags, $AsJob
         }
 
         # Find all the resources associated with this lab (only proceed if we found the lab)
         if ($labObj.Properties.uniqueIdentifier) {
             Get-AzureRmResource -TagName hidden-DevTestLabs-LabUId -TagValue $labObj.Properties.uniqueIdentifier `
                   | ForEach-Object {
-                      Set-AzureRmResource -ResourceId $_.ResourceId -Tag (Unify-Tags $_.Tags $tags) -Force | Out-Null
+
+                      Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $_, $false, $tags, $AsJob
 
                       if ($_.ResourceType -eq 'Microsoft.Compute/virtualMachines') {
                          # We need to get the disks on the VM and tag those - disks from specialized images don't have a hidden tag
@@ -713,29 +792,20 @@ function Add-AzDtlLabTags {
                          # Tag the compute's resource group assuming it's not the lab's RG
                          if ($vm.ResourceGroupName -ne $labObj.ResourceGroupName) {
                             $vmRg = Get-AzureRmResourceGroup -Name $vm.ResourceGroupName
-                            Set-AzureRmResourceGroup -Name $vm.ResourceGroupName -Tag (Unify-Tags $vmRg.Tags $tags) | Out-Null
+
+                            Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $vmRg, $true, $tags, $AsJob
                          }
 
                          # Add tags to the OS disk (VMs should always have an OS disk
-                         $disk = Get-AzureRmResource -ResourceId $vm.Properties.storageProfile.osDisk.managedDisk.id
-                         Set-AzureRmResource -ResourceId $disk.Id -Tag (Unify-Tags $disk.Tags $tags) -Force | Out-Null
+                         Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $vm.Properties.storageProfile.osDisk.managedDisk.id, $false, $tags, $AsJob
 
                          # Add Tags to the data disks
                          $vm.Properties.storageProfile.dataDisks | ForEach-Object {
-                            $dataDisk = Get-AzureRmResource -ResourceId $_.managedDisk.id
-                            Set-AzureRmResource -ResourceId $dataDisk.Id -Tag (Unify-Tags $dataDisk.Tags $tags) -Force | Out-Null
-                         }
+                         Invoke-Command -ScriptBlock $StartJobIfNeeded -ArgumentList $_.managedDisk.id, $false, $tags, $AsJob
                       }
                   }
+              }
         }
-      }
-
-      if($AsJob) {
-        Start-Job      -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz
-      } else {
-        Invoke-Command -ScriptBlock $sb -ArgumentList $Lab, $tags, $justAz
-      }
-
     } 
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
@@ -743,6 +813,94 @@ function Add-AzDtlLabTags {
   } 
   end {
   }
+}
+
+function Set-AzDtlLabIpPolicy {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Lab to query for Shared Image Gallery")]
+    [ValidateNotNullOrEmpty()]
+    $Lab,
+
+    [parameter(Mandatory=$false, HelpMessage="Name of the subnet to update the properties.  If left out, all subnets are updated")]
+    [string]
+    $SubnetName,
+
+    [parameter(Mandatory=$true, HelpMessage="Public=separate IP Address, Shared=load balancers optimizes IP Addresses, Private=No public IP address.")]
+    [Validateset('Public','Private', 'Shared')]
+    [string]
+    $IpConfig = 'Shared'
+  )
+
+  begin {. BeginPreamble}
+  process {
+    try{
+
+      $sharedIpConfig = @"
+{
+    "allowedPorts":  [
+                        {
+                            "transportProtocol" : "Tcp",
+                            "backendPort" : "3389"
+                        },
+                        {
+                            "transportProtocol" : "Tcp",
+                            "backendPort" : "22"
+                        }
+                        ]
+}
+"@ | ConvertFrom-Json
+
+      Write-verbose "Retrieving Virtual Network for lab $($Lab.Name) ..."
+      $vnets = Get-AzResource -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName -ResourceType 'Microsoft.DevTestLab/labs/virtualnetworks' -ApiVersion 2018-10-15-preview
+
+      # Iterate through the vnets for all the subnets
+      foreach ($vnet in $vnets) {
+        # Iterate through the subnets and set the properties appropriately
+        foreach ($subnet in $vnet.Properties.subnetOverrides) {
+            # Only update if it matches the subnet name/subnetname is missing AND if this is a VNet used for VM Creation
+            if ((-not $SubnetName -or ($subnet.labSubnetName -like $SubnetName)) -and ($subnet.useInVmCreationPermission -eq "Allow")) {
+                if ($IpConfig -eq 'Shared') {
+                    if ($subnet.PSObject.Properties.Name -match "sharedPublicIpAddressConfiguration") {
+                        $subnet.sharedPublicIpAddressConfiguration = $sharedIpConfig
+                    }
+                    else {
+                        Add-Member -InputObject $subnet -MemberType NoteProperty -Name "sharedPublicIpAddressConfiguration" -Value $sharedIpConfig
+                    }
+
+                    $subnet.usePublicIpAddressPermission = $false
+                }
+                elseif ($IpConfig -eq 'Public') {
+                    if ($subnet.PSObject.Properties.Name -match "sharedPublicIpAddressConfiguration") {
+                        $subnet.PSObject.Properties.Remove("sharedPublicIpAddressConfiguration")
+                    }
+
+                    $subnet.usePublicIpAddressPermission = $true
+
+                }
+                elseif ($IpConfig -eq 'Private') {
+                    if ($subnet.PSObject.Properties.Name -match "sharedPublicIpAddressConfiguration") {
+                        $subnet.PSObject.Properties.Remove("sharedPublicIpAddressConfiguration")
+                    }
+
+                    $subnet.usePublicIpAddressPermission = $false
+                }
+            }
+        }
+        # Push this VNet back to Azure
+        Set-AzResource -ResourceId $vnet.ResourceId -Properties $vnet.Properties -Force
+      }
+
+      # Return the lab to continue in the pipeline
+      return $Lab
+    } 
+    catch {
+      Write-Error -ErrorRecord $_ -EA $callerEA
+    }
+  } 
+  end {
+  }
+
 }
 
 function Get-AzDtlLabSharedImageGallery {
@@ -1127,15 +1285,40 @@ function Start-AzDtlVm {
   param(
     [parameter(Mandatory=$true,HelpMessage="VM to start. Noop if already started.", ValueFromPipeline=$true)]
     [ValidateNotNullOrEmpty()]
-    $Vm
+    $Vm,
+
+    [parameter(Mandatory=$false,HelpMessage="Run the command in a separate job.")]
+    [switch] $AsJob = $False
   )
 
   begin {. BeginPreamble}
   process {
     try {
+
+        $sb = {
+          param($vm, $justAz)
+
+          if($justAz) {
+            Enable-AzureRmAlias -Scope Local -Verbose:$false
+            # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
+            $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+            $Mutex.WaitOne() | Out-Null
+            Enable-AzContextAutosave -Scope Process | Out-Null
+            $rg = Get-AzResourceGroup | Out-Null
+            $Mutex.ReleaseMutex() | Out-Null
+          }
+
+          Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "start" -Force | Out-Null
+          Get-AzureRmResource -ResourceId $vm.ResourceId -ExpandProperties
+        }
+
       foreach($v in $Vm) {
-        Invoke-AzureRmResourceAction -ResourceId $v.ResourceId -Action "start" -Force | Out-Null
-        $v | Get-AzDtlVm
+
+          if($AsJob.IsPresent) {
+            Start-Job      -ScriptBlock $sb -ArgumentList $v, $justAz
+          } else {
+            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $justAz
+          }
       }
     } catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
@@ -1149,15 +1332,40 @@ function Stop-AzDtlVm {
   param(
     [parameter(Mandatory=$true,HelpMessage="VM to stop. Noop if already stopped.", ValueFromPipeline=$true)]
     [ValidateNotNullOrEmpty()]
-    $Vm
+    $Vm,
+
+    [parameter(Mandatory=$false,HelpMessage="Run the command in a separate job.")]
+    [switch] $AsJob = $False
   )
 
   begin {. BeginPreamble}
   process {
     try {
+        $sb = {
+          param($vm, $justAz)
+
+          if($justAz) {
+            Enable-AzureRmAlias -Scope Local -Verbose:$false
+            # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
+            $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+            $Mutex.WaitOne() | Out-Null
+            Enable-AzContextAutosave -Scope Process | Out-Null
+            $rg = Get-AzResourceGroup | Out-Null
+            $Mutex.ReleaseMutex() | Out-Null
+     
+          }
+
+          Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "stop" -Force | Out-Null
+          Get-AzureRmResource -ResourceId $vm.ResourceId -ExpandProperties
+        }
+
       foreach($v in $Vm) {
-        Invoke-AzureRmResourceAction -ResourceId $v.ResourceId -Action "stop" -Force | Out-Null
-        $v  | Get-AzDtlVm
+
+          if($AsJob.IsPresent) {
+            Start-Job      -ScriptBlock $sb -ArgumentList $v, $justAz
+          } else {
+            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $justAz
+          }
       }
     } catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
@@ -1410,6 +1618,76 @@ function Set-AzDtlShutdownPolicy {
   end {}
 }
 
+function Set-AzDtlMandatoryArtifacts {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Lab object to set Shared Image Gallery")]
+    [ValidateNotNullOrEmpty()]
+    $Lab,
+
+    [parameter(Mandatory=$false,HelpMessage="The names of mandatory artifacts for Windows-based OS")]
+    [array] $WindowsArtifactNames,
+
+    [parameter(Mandatory=$false,HelpMessage="The names of mandatory artifacts for Linux-based OS")]
+    [array] $LinuxArtifactNames
+
+  )
+
+  begin {. BeginPreamble}
+  process {
+    try{
+
+        # NOTE: It's OK if both windows/linux artifacts are null - that means clear out both lists
+        # NOTE2: There is some code duplication, powershell mucks with parameters, didn't work when moving common code to a function
+
+        # First we need to get the current state of the lab
+        $labObj = MyGetResourceLab $Lab.Name $Lab.ResourceGroupName
+
+        # Pre-process the $WindowsArtifactNames variable
+        if ($WindowsArtifactNames) {
+            # If the user passed in a string, convert it to an array
+            if ($WindowsArtifactNames -and $WindowsArtifactNames.GetType().Name -eq "String") {
+                $WindowsArtifactNames = @($WindowsArtifactNames)
+            }
+
+            # If the user didn't pass full IDs, we need to convert them
+            for ($i = 0; $i -lt $WindowsArtifactNames.Count; $i ++) {
+                if (-not $WindowsArtifactNames[$i].contains('/')) {
+                    $WindowsArtifactNames.Item($i) = "$($labObj.ResourceId)/artifactSources/public repo/artifacts/$($WindowsArtifactNames[$i])"
+                }
+            }
+        }
+
+        $labObj.Properties.mandatoryArtifactsResourceIdsWindows = $WindowsArtifactNames
+
+        # Pre-process the $LinuxArtifactNames variable
+        if ($LinuxArtifactNames) {
+            # If the user passed in a string, convert it to an array
+            if ($LinuxArtifactNames -and $LinuxArtifactNames.GetType().Name -eq "String") {
+                $LinuxArtifactNames = @($LinuxArtifactNames)
+            }
+
+            # If the user didn't pass full IDs, we need to convert them
+            for ($i = 0; $i -lt $LinuxArtifactNames.Count; $i ++) {
+                if (-not $LinuxArtifactNames[$i].contains('/')) {
+                    $LinuxArtifactNames.Item($i) = "$($labObj.ResourceId)/artifactSources/public repo/artifacts/$($LinuxArtifactNames[$i])"
+                }
+            }
+        }
+
+        $labObj.Properties.mandatoryArtifactsResourceIdsLinux = $LinuxArtifactNames
+
+        Set-AzureRmResource -Name $labObj.Name -ResourceGroupName $labObj.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs" -Properties $labObj.Properties -ApiVersion 2018-10-15-preview -Force
+
+    } 
+    catch {
+      Write-Error -ErrorRecord $_ -EA $callerEA
+    }
+  } 
+  end {
+  }
+}
+
 function Get-AzDtlVmArtifact {
   [CmdletBinding()]
   param(
@@ -1451,64 +1729,95 @@ function Set-AzDtlVmArtifact {
     [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true,HelpMessage="Parameters for artifact. An array of hashtable, each one as @{name = xxx; value = yyy}.")]
     [ValidateNotNullOrEmpty()]
     [array]
-    $ArtifactParameters = @()
+    $ArtifactParameters = @(),
+
+    [parameter(Mandatory=$false,HelpMessage="Run the command in a separate job.")]
+    [switch] $AsJob = $False
   )
 
   begin {. BeginPreamble}
   process {
     try {
-      foreach($v in $Vm) {
-        $ResourceGroupName = $v.ResourceGroupName
 
-        #TODO: is there a better way? It doesn't seem to be in Expanded props of VM ...
-        $LabName = $v.ResourceId.Split('/')[8]
-        if(-not $LabName) {
-          throw "VM Name for $v is not in the format 'RGName/VMName. Why?"
-        }
+        $sb = {
+            param(
+                $v,
+                [string] $RepositoryName,
+                [string] $ArtifactName,
+                [array] $ArtifactParameters = @(),
+                $justAz
+            )
 
-        # Get internal repo name
-        $repository = Get-AzureRmResource -ResourceGroupName $resourceGroupName `
-          -ResourceType 'Microsoft.DevTestLab/labs/artifactsources' `
-          -ResourceName $LabName -ApiVersion 2016-05-15 `
-          | Where-Object { $RepositoryName -in ($_.Name, $_.Properties.displayName) } `
-          | Select-Object -First 1
-
-        if(-not $repository) {
-          throw "Unable to find repository $RepositoryName in lab $LabName."
-        }
-        Write-verbose "Repository found is $($repository.Name)"
-
-        # Get internal artifact name
-        $template = Get-AzureRmResource -ResourceGroupName $ResourceGroupName `
-          -ResourceType "Microsoft.DevTestLab/labs/artifactSources/artifacts" `
-          -ResourceName "$LabName/$($repository.Name)" `
-          -ApiVersion 2016-05-15 `
-          | Where-Object { $ArtifactName -in ($_.Name, $_.Properties.title) } `
-          | Select-Object -First 1
-
-        if(-not $template) {
-          throw "Unable to find template $ArtifactName in lab $LabName."
-        }
-        Write-verbose "Template artifact found is $($template.Name)"
-
-        #TODO: is there a better way to construct this?
-        $SubscriptionID = (Get-AzureRmContext).Subscription.Id
-        $FullArtifactId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.DevTestLab/labs/$LabName/artifactSources/$($repository.Name)/artifacts/$($template.Name)"
-        Write-verbose "Using artifact id $FullArtifactId"
-
-        $prop = @{
-          artifacts = @(
-            @{
-              artifactId = $FullArtifactId
-              parameters = $ArtifactParameters
+            if($justAz) {
+                Enable-AzureRmAlias -Scope Local -Verbose:$false
+                # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
+                $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+                $Mutex.WaitOne() | Out-Null
+                Enable-AzContextAutosave -Scope Process | Out-Null
+                $rg = Get-AzResourceGroup | Out-Null
+                $Mutex.ReleaseMutex() | Out-Null
+          
             }
-          )
+
+            $ResourceGroupName = $v.ResourceGroupName
+
+            #TODO: is there a better way? It doesn't seem to be in Expanded props of VM ...
+            $LabName = $v.ResourceId.Split('/')[8]
+            if(-not $LabName) {
+              throw "VM Name for $v is not in the format 'RGName/VMName. Why?"
+            }
+
+            # Get internal repo name
+            $repository = Get-AzureRmResource -ResourceGroupName $resourceGroupName `
+              -ResourceType 'Microsoft.DevTestLab/labs/artifactsources' `
+              -ResourceName $LabName -ApiVersion 2016-05-15 `
+              | Where-Object { $RepositoryName -in ($_.Name, $_.Properties.displayName) } `
+              | Select-Object -First 1
+
+            if(-not $repository) {
+              throw "Unable to find repository $RepositoryName in lab $LabName."
+            }
+            Write-verbose "Repository found is $($repository.Name)"
+
+            # Get internal artifact name
+            $template = Get-AzureRmResource -ResourceGroupName $ResourceGroupName `
+              -ResourceType "Microsoft.DevTestLab/labs/artifactSources/artifacts" `
+              -ResourceName "$LabName/$($repository.Name)" `
+              -ApiVersion 2016-05-15 `
+              | Where-Object { $ArtifactName -in ($_.Name, $_.Properties.title) } `
+              | Select-Object -First 1
+
+            if(-not $template) {
+              throw "Unable to find template $ArtifactName in lab $LabName."
+            }
+            Write-verbose "Template artifact found is $($template.Name)"
+
+            #TODO: is there a better way to construct this?
+            $SubscriptionID = (Get-AzureRmContext).Subscription.Id
+            $FullArtifactId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.DevTestLab/labs/$LabName/artifactSources/$($repository.Name)/artifacts/$($template.Name)"
+            Write-verbose "Using artifact id $FullArtifactId"
+
+            $prop = @{
+              artifacts = @(
+                @{
+                  artifactId = $FullArtifactId
+                  parameters = $ArtifactParameters
+                }
+              )
+            }
+
+            Write-debug "Apply:`n $($prop | ConvertTo-Json)`n to $($v.ResourceId)."
+            Write-verbose "Using $FullArtifactId on $($v.ResourceId)"
+            Invoke-AzureRmResourceAction -Parameters $prop -ResourceId $v.ResourceId -Action "applyArtifacts" -ApiVersion 2016-05-15 -Force | Out-Null
+            Get-AzureRmResource -ResourceId $v.ResourceId -ExpandProperties
         }
 
-        Write-debug "Apply:`n $($prop | ConvertTo-Json)`n to $($v.ResourceId)."
-        Write-verbose "Using $FullArtifactId on $($v.ResourceId)"
-        Invoke-AzureRmResourceAction -Parameters $prop -ResourceId $v.ResourceId -Action "applyArtifacts" -ApiVersion 2016-05-15 -Force | Out-Null
-        $v  | Get-AzDtlVm
+      foreach($v in $Vm) {
+          if($AsJob.IsPresent) {
+            Start-Job      -ScriptBlock $sb -ArgumentList $v, $RepositoryName, $ArtifactName, $artifactParameters, $justAz
+          } else {
+            Invoke-Command -ScriptBlock $sb -ArgumentList $v, $RepositoryName, $ArtifactName, $artifactParameters, $justAz
+          }
       }
     } catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
@@ -1878,6 +2187,12 @@ function New-AzDtlVm {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
+            # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
+            $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+            $Mutex.WaitOne() | Out-Null
+            Enable-AzContextAutosave -Scope Process | Out-Null
+            $rg = Get-AzResourceGroup | Out-Null
+            $Mutex.ReleaseMutex() | Out-Null
           }
           $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -existingLabName $Name -newVmName $VmName
           Write-debug "Deployment succeded with deployment of `n$deployment"
@@ -2148,31 +2463,31 @@ function Add-AzDtlLabUser {
 function Add-AzDtlLabArtifactRepository {
   [CmdletBinding()]
   param(
-    [parameter(Mandatory=$true, ValueFromPipeline = $true, HelpMessage="Lab to add announcement to.")]
+    [parameter(Mandatory=$true, ValueFromPipeline = $true, HelpMessage="Lab to add artifact repository to.")]
     [ValidateNotNullOrEmpty()]
     $Lab,
 
-    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Title of announcement.")]
+    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Artifact repository display name.")]
     [ValidateNotNullOrEmpty()]
     [string] $ArtifactRepositoryDisplayName = "Team Repository",
 
-    [parameter(Mandatory=$true, ValueFromPipelineByPropertyName = $true, HelpMessage="Markdown of announcement.")]
+    [parameter(Mandatory=$true, ValueFromPipelineByPropertyName = $true, HelpMessage="Artifact repo URI.")]
     [ValidateNotNullOrEmpty()]
     [string] $ArtifactRepoUri,
 
-    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Expiration of announcement (format '2100-01-01T17:00:00+00:00').")]
+    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Branch to use for the artifact repo.")]
     [ValidateNotNullOrEmpty()]
     [string] $ArtifactRepoBranch = "master",
 
-    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Expiration of announcement (format '2100-01-01T17:00:00+00:00').")]
+    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Folder for artifacts")]
     [ValidateNotNullOrEmpty()]
     [string] $ArtifactRepoFolder = "Artifacts/",
 
-    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Expiration of announcement (format '2100-01-01T17:00:00+00:00').")]
+    [parameter(Mandatory=$false, ValueFromPipelineByPropertyName = $true, HelpMessage="Type of artifact repo")]
     [ValidateSet("VsoGit", "GitHub")]
     [string] $ArtifactRepoType = "GitHub",
 
-    [parameter(Mandatory=$true, ValueFromPipelineByPropertyName = $true, HelpMessage="Expiration of announcement (format '2100-01-01T17:00:00+00:00').")]
+    [parameter(Mandatory=$true, ValueFromPipelineByPropertyName = $true, HelpMessage="PAT token for the artifact repo")]
     [ValidateNotNullOrEmpty()]
     [string] $ArtifactRepoSecurityToken,
 
@@ -3133,6 +3448,12 @@ function Import-AzDtlCustomImageFromUri {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
+            # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
+            $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+            $Mutex.WaitOne() | Out-Null
+            Enable-AzContextAutosave -Scope Process | Out-Null
+            $rg = Get-AzResourceGroup | Out-Null
+            $Mutex.ReleaseMutex() | Out-Null
           }
           # Get storage account for the lab
           $labRgName= $l.ResourceGroupName
@@ -3300,7 +3621,9 @@ New-Alias -Name 'Dtl-ApplyArtifact'       -Value Set-AzDtlVmArtifact
 New-Alias -Name 'Dtl-GetLabSchedule'      -Value Get-AzDtlLabSchedule
 New-Alias -Name 'Dtl-SetLabShutdown'      -Value Set-AzDtlLabShutdown
 New-Alias -Name 'Dtl-SetLabStartup'       -Value Set-AzDtlLabStartupSchedule
+New-Alias -Name 'Dtl-SetLabIpPolicy'      -Value Set-AzDtlLabIpPolicy
 New-Alias -Name 'Dtl-SetLabShutPolicy'    -Value Set-AzDtlShutdownPolicy
+New-Alias -Name 'Dtl-SetMandatoryArtifacts' -value Set-AzDtlMandatoryArtifacts
 New-Alias -Name 'Dtl-GetLabAllowedVmSizePolicy' -Value Get-AzDtlLabAllowedVmSizePolicy
 New-Alias -Name 'Dtl-SetLabAllowedVmSizePolicy' -Value Set-AzDtlLabAllowedVmSizePolicy
 New-Alias -Name 'Dtl-GetSharedImageGallery' -Value Get-AzDtlLabSharedImageGallery
@@ -3344,11 +3667,13 @@ Export-ModuleMember -Function New-AzDtlLab,
                               Get-AzDtlLabSchedule,
                               Set-AzDtlLabShutdown,
                               Set-AzDtlLabStartupSchedule,
+                              Set-AzDtlMandatoryArtifacts,
                               New-AzDtlLabEnvironment,
                               Get-AzDtlLabEnvironment,
                               Set-AzDtlShutdownPolicy,
                               Set-AzDtlVmAutoStart,
                               Set-AzDtlVmShutdownSchedule,
+                              Set-AzDtlLabIpPolicy,
                               Get-AzDtlLabAllowedVmSizePolicy,
                               Set-AzDtlLabAllowedVmSizePolicy,
                               Get-AzDtlLabSharedImageGallery,

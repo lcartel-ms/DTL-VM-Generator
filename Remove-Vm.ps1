@@ -20,6 +20,12 @@ param
 
 $ErrorActionPreference = "Stop"
 
+# Workaround for https://github.com/Azure/azure-powershell/issues/9448
+$Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+$Mutex.WaitOne() | Out-Null
+$rg = Get-AzResourceGroup | Out-Null
+$Mutex.ReleaseMutex() | Out-Null
+
 . "./Utils.ps1"
 
 function Select-Vms {
@@ -63,11 +69,15 @@ $selectedVms = Select-Vms $vms
 $jobs = @()
 $selectedVms | ForEach-Object {
 
-  $sb = [scriptblock]::create(
-    @"
-    Remove-AzResource -ResourceId $($_.ResourceId) -Force
-"@)
+  $sb = {
+    # Workaround for https://github.com/Azure/azure-powershell/issues/9448
+    $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+    $Mutex.WaitOne() | Out-Null
+    $rg = Get-AzResourceGroup | Out-Null
+    $Mutex.ReleaseMutex() | Out-Null
 
+    Remove-AzDtlVm -Vm $Using:_
+  }
   $jobs += Start-RSJob -ScriptBlock $sb -Name $_.Name -ModulesToImport $AzDtlModulePath
 
   Start-Sleep -Seconds 2
