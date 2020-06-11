@@ -1648,7 +1648,7 @@ function Convert-AzDtlVirtualNetwork {
       }
 
       $dtlVirtualNetworkId = $VirtualNetworkId.Replace("Microsoft.Network", "microsoft.devtestlab/labs/$($Lab.Name)")
-      Get-AzResource -ResourceId $dtlVirtualNetworkId
+      Get-AzureRmResource -ResourceId $dtlVirtualNetworkId
       
     } catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
@@ -1812,6 +1812,7 @@ function New-AzDtlBastion {
       # Once this is supported, we can deploy a Bastion to 1 VNet
       # and the other VNets will be able to host VMs enabled for browser connection
       # without furtherly creating their own Bastion subnet.
+      Write-Host "Retrieving the attached Virtual Network where to deploy the Azure Bastion"
       $LabVirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetworkId
 
       # In the Lab VNets, look for an underlying subnet supporting VMs creation.
@@ -1828,31 +1829,42 @@ function New-AzDtlBastion {
       }
 
       # Make sure to get the underlying VNet for this Lab
+      Write-Host "Retrieving the underlying attached Virtual Network used to deploy the Azure Bastion"
       $VirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetwork.ResourceId -ExpandedNetwork
 
+      #TODO Skip this step if there is already a subnet named 'AzureBastionSubnet'
       # Try to create a new subnet named 'AzureBastionSubnet' in this address range
+      Write-Host "Adding a subnet 'AzureBastionSubnet' at $BastionSubnetAddressPrefix"
       $VirtualNetwork = Add-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $VirtualNetwork -Name "AzureBastionSubnet" -AddressPrefix $BastionSubnetAddressPrefix
       $VirtualNetwork = Set-AzureRmVirtualNetwork -VirtualNetwork $VirtualNetwork
+      Write-Host "Subnet 'AzureBastionSubnet' successfully added to the Virtual Network"
 
       # IP must be in the same region of the Bastion
+      Write-Host "Creating a Public IP address for the Bastion host"
       $bastionPublicIpAddress =
-              New-AzPublicIpAddress `
+              New-AzureRmPublicIpAddress `
                   -ResourceGroupName $Lab.ResourceGroupName `
                   -Name "$($Lab.Name)PublicIP" `
                   -Location $Lab.Location `
                   -AllocationMethod "Static" `
                   -Sku "Standard"
+      Write-Host "Bastion Public IP address successfully created at $($bastionPublicIpAddress.IpAddress)"
 
       # Deploy the Bastion
+      Write-Host "Creating the Bastion resource"
       New-AzBastion `
           -ResourceGroupName $Lab.ResourceGroupName `
           -Name "$($Lab.Name)Bastion" `
           -PublicIpAddress $bastionPublicIpAddress `
           -VirtualNetwork $VirtualNetwork
+      Write-Host "Azure Bastion resource successfully created"
 
       # Make sure BrowserConnect property for the Lab is set to enabled
       # Must use the Preview API
+      
       if ($Lab.Properties.browserConnect -ne "Enabled") {
+
+        Write-Host "Enabling Browser Connection for VMs in the Lab"
 
         $Lab.Properties.browserConnect = "Enabled"
         Set-AzureRmResource `
@@ -1860,9 +1872,12 @@ function New-AzDtlBastion {
           -ApiVersion 2018-10-15-preview `
           -Properties $Lab.Properties `
           -Force | Out-Null
+
+        Write-Host "Browser Connection successfully enabled"
       }
 
       # Return the updated lab
+      Write-Host "Returning the Lab"
       $Lab | Get-AzDtlLab
     }
     catch {

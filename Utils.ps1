@@ -359,7 +359,6 @@ function Get-VirtualNetworkUnassignedSpace {
       }
 
       $subnetAddressRangeStart = $subnetAddressRangeInfo.NetworkAddress
-      $subnetAddressRangeEnd = $subnetAddressRangeInfo.Broadcast
 
       # Init the lower and upper bounds to subnetAddressRangeStart
       $lowestAssignedIp = $highestAssignedIp = $subnetAddressRangeStart
@@ -416,38 +415,6 @@ function Get-VirtualNetworkUnassignedSpace {
   }
 }
 
-function Get-AzDtlVirtualNetworkFromUnderlyingVnet {
-  [CmdletBinding()]
-  param(
-    [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Lab object to set Shared Image Gallery")]
-    [ValidateNotNullOrEmpty()]
-    $Lab,
-
-    [parameter(Mandatory=$true, HelpMessage="Id of type Microsoft.Network of the Lab Virtual Network")]
-    [ValidateNotNullOrEmpty()]
-    $VirtualNetworkId
-  )
-
-  try {
-
-    # Trying to pass through the LabUId tag is a dead end.
-    # No way to get the name of the Lab.
-  
-    # $DtlLabUId = $VirtualNetwork.Tags.GetEnumerator() | `
-    # Where-Object { $_.Key -eq "hidden-DevTestLabs-LabUId" } | `
-    # Select-Object -ExpandProperty Value -First 1
-
-    if ($VirtualNetworkId.Split("/")[6] -ine "Microsoft.Network") {
-      throw "VirtualNetworkId is not of type Microsoft.Network"
-    }
-
-    $dtlVirtualNetworkId = $VirtualNetworkId.Replace("Microsoft.Network", "microsoft.devtestlab/labs/$($Lab.Name)")
-    Get-AzResource -ResourceId $dtlVirtualNetworkId
-  } catch {
-    Write-Error -ErrorRecord $_ -EA $callerEA
-  }
-}
-
 function New-BastionHost {
   [CmdletBinding()]
   param(
@@ -460,47 +427,60 @@ function New-BastionHost {
 
   try {
     
+    Write-Host "Trying to deploy a new Bastion for the Lab $DevTestLabName"
+
     $lab = Get-AzDtlLab -ResourceGroupName $ResourceGroupName -Name $DevTestLabName
     
     # Get the underlying VNets
+    Write-Host "Retrieving details of the Lab VNet"
     $virtualNetworks = $lab | Get-AzDtlLabVirtualNetworks -ExpandedNetwork
 
     # Try to get an address range with lenght >= 27 (smallest supported by Bastion)
+    Write-Host "Trying to get an unallocated address range of size >= /27"
     $bastionAddressSpace = Get-VirtualNetworkUnallocatedSpace -VirtualNetwork $virtualNetworks -Length 27
     if (-not $bastionAddressSpace) {
-      Write-Host "No address space to deploy a Bastion subnet of length 27"
-      Write-Host "Trying to halve an existing subnet..."
+      Write-Host "No unallocated address range to deploy a Bastion subnet of length 27"
 
       # Logic to halve an existing subnet
       # TODO should we ask permission to the user?
+      Write-Host "Trying to halve an existing subnet..."
       $vnetUnassignedSpace = Get-VirtualNetworkUnassignedSpace -VirtualNetwork $virtualNetworks -Length 27
       if (!($vnetUnassignedSpace)) {
+        Write-Error "No available address space or subnet to deploy a Bastion host"
         throw "No address space or subnet to deploy a Bastion host. To proceed, please expand the Virtual Network address range."
       }
 
       $resizingVirtualNetworkSubnet = $vnetUnassignedSpace.VirtualNetworkSubnet
       $assignedAddressSpace = $vnetUnassignedSpace.AssignedSubnetSpace
       $bastionAddressSpace = $vnetUnassignedSpace.UnassignedSubnetSpace
-      
+
       # Shrink the VirtualNetwork subnet to the assigned range only
       # It does not matter which kind of subnet (e.g. 'UsedInVmCreation','UsedInPublicIpAddress')
+      Write-Host "Resizing subnet $($resizingVirtualNetworkSubnet.AddressPrefix) to $assignedAddressSpace"
       $virtualNetworks.Subnets | ForEach-Object {
         if ($_.Id -eq $resizingVirtualNetworkSubnet.Id) {
           $_.AddressPrefix = $assignedAddressSpace
         }
       }
       $virtualNetworks = Set-AzureRmVirtualNetwork -VirtualNetwork $virtualNetworks
+
+      Write-Host "Subnet successfully resized to $assignedAddressSpace"
     }
 
     # Resize the address space to the minimum /27, in case we found a larger one at the previous step.
     # TODO check limitations of having a /27 Bastion subnet. Is it 1 address per VM?
     $bastionAddressSpace = $bastionAddressSpace.Split("/")[0] + "/27"
+    
+    Write-Host "Found an available address range at $bastionAddressSpace"
 
     # Get the corresponding DTL VNet
     $labVirtualNetworks = $lab | Convert-AzDtlVirtualNetwork -VirtualNetworkId $virtualNetworks.Id
     
     # Deploy the Bastion to the specific VNet address range
+    Write-Host "Deploying the Bastion at $bastionAddressSpace"
     $lab | New-AzDtlBastion -LabVirtualNetworkId $labVirtualNetworks.Id -BastionSubnetAddressPrefix $bastionAddressSpace
+  
+    Write-Host "Azure Bastion successfully deployed"
   }
   catch {
     Write-Error -ErrorRecord $_
