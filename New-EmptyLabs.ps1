@@ -41,16 +41,17 @@ $labCreateJobs = $config | ForEach-Object {
                            }
 Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
 
-if ($true) { # if set Bastion
+$configBastion = $config | Where-Object { $_.BastionEnabled -eq $true }
+if ($configBastion.Count -gt 0) {
     # Deploy the Azure Bastion hosts to the labs
     Write-Host "---------------------------------" -ForegroundColor Green
-    Write-Host "Deploying $configCount Bastion hosts to the labs..." -ForegroundColor Green
-    # $bastionDeployJobs = $config | ForEach-Object { # TODO
-    $config | ForEach-Object {
-        $_ | New-BastionHost -ResourceGroupName $_.ResourceGroupName -DevTestLabName $_.DevTestLabName
-        Start-Sleep -Seconds $SecondsBetweenLoop
-   }
+    Write-Host "Deploying $($configBastion.Count) Bastion hosts to the labs..." -ForegroundColor Green
+    # $bastionDeployJobs = $config | ForEach-Object { # TODO parallel
+    $configBastion | ForEach-Object {
+        New-BastionHost -ResourceGroupName $_.ResourceGroupName -DevTestLabName $_.DevTestLabName
+        # Start-Sleep -Seconds $SecondsBetweenLoop
     # Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
+    }
 }
 
 # Update the shutdown policy on the labs
