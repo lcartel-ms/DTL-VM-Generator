@@ -70,7 +70,7 @@ function Import-RemoteScript {
   $scriptPath = Join-Path -Path (Resolve-Path ./) -ChildPath $ScriptName
 
   if (Test-Path -Path $scriptPath) {
-      Remove-Item -Path $scriptPath
+      Remove-Item -Path $scriptPath | Out-Null
   }
 
   $WebClient = New-Object System.Net.WebClient
@@ -78,23 +78,18 @@ function Import-RemoteScript {
 
   New-Alias -Name $AliasName -Scope Script -Value $scriptPath -Force
 }
-
 function Import-AzDtlModule {
    Import-RemoteModule -Source $AzDtlModuleSource -ModuleName "$AzDtlModuleName.psm1"
 }
-
 function Remove-AzDtlModule {
    Remove-Module -Name $AzDtlModuleName -ErrorAction SilentlyContinue
 }
-
 function Import-PsipcalcScript {
   Import-RemoteScript -Source $PSipcalcSource -ScriptName $PSipcalcName -AliasName $PSipcalcAliasName 
 }
-
 function Remove-PsipcalcScript {
   Remove-Item -Path $PSipcalcScriptPath
 }
-
 function Set-LabAccessControl {
   param(
     $DevTestLabName,
@@ -154,7 +149,7 @@ filter Convert-IPToDecimal {
           return [Convert]::ToInt64($str, 2)
       }
       catch {
-          Write-Warning -Message "Error converting '$IP' to a binary string: $_"
+          Write-Warning -Message "Error converting '$IP' to a decimal: $_"
           return $null
       }
   }
@@ -165,21 +160,7 @@ filter Convert-IPToDecimal {
 }
 
 filter Convert-DecimalToIP {
-  
-  $IPDecimal = $_
-  # $sb = [System.Text.StringBuilder]::new()
-
-  # [void]$sb.Insert(0, ".$($IPDecimal -band 255)")
-  # $IPDecimal = $IPDecimal -shr 8;
-  # [void]$sb.Insert(0, ".$($IPDecimal -band 255)")
-  # $IPDecimal = $IPDecimal -shr 8;
-  # [void]$sb.Insert(0, ".$($IPDecimal -band 255)")
-  # $IPDecimal = $IPDecimal -shr 8;
-  # [void]$sb.Insert(0, "$($IPDecimal -band 255)")
-
-  # return $sb.ToString()
-
-  return "$($IPDecimal -shr 24).$(($IPDecimal -shr 16) -band 255).$(($IPDecimal -shr 8) -band 255).$($IPDecimal -band 255)"
+  "$($_ -shr 24).$(($_ -shr 16) -band 255).$(($_ -shr 8) -band 255).$($_ -band 255)"
 }
 
 function Convert-IPRangeToCIDRNotation {
@@ -242,7 +223,7 @@ function Get-VirtualNetworkUnallocatedSpace {
     
     # Solution:
     # Build a hashtable of starting and ending address ranges, ordered by start of address range
-    # On a second pass calculate the delta between i_end and i+1_start. If it is wide enough, that is the range to return
+    # On a second pass calculate the delta between i_end and i+1_start. If it is large enough, that is the range to return
     
     # [[10.0.0.0, 10.0.0.0], [10.0.4.0, 10.0.6.0], [10.0.7.0, 10.0.8.0], [10.0.8.0, 10.0.9.0], [10.1.0.0, 10.1.0.0]]
     # TO ->
@@ -302,7 +283,7 @@ function Get-VirtualNetworkUnallocatedSpace {
       }
     }
 
-    # Ordered Array of unallocated ranges (CIDR notation) calculated as a diff
+    # Ordered Array of unallocated ranges (CIDR notation) calculated as a complement to the above table
     $unallocatedSubnetRanges = [System.Collections.ArrayList]@()
 
     $allocatedSubnetStarts = [array]$allocatedSubnetRanges.Keys
@@ -319,7 +300,7 @@ function Get-VirtualNetworkUnallocatedSpace {
           $nextsubnetAddressRangeEnd = (($nextNextsubnetAddressRangeStart | Convert-IPToDecimal) - 1) | Convert-DecimalToIp 
           
           $unallocatedAddressRange = Convert-IPRangeToCIDRNotation -Start $nextsubnetAddressRangeStart -End $nextsubnetAddressRangeEnd 
-          $unallocatedSubnetRanges.Add($unallocatedAddressRange)
+          $unallocatedSubnetRanges.Add($unallocatedAddressRange) | Out-Null
 
         } # else contiguous subnet
       }
@@ -354,9 +335,10 @@ function Get-VirtualNetworkUnassignedSpace {
     # Using Psipcal
     Import-PsipcalcScript
 
-    $vnetAddressRangeInfo = Invoke-PSipcalc -NetworkAddress $VirtualNetwork.AddressSpace.AddressPrefixes
-    $vnetAddressLength = $vnetAddressRangeInfo.NetworkLength
-    if ($vnetAddressLength -ge $Length) {
+    # Get Highest address prefix length
+    $networkLengths = $VirtualNetwork.AddressSpace.AddressPrefixes | Select-Object -Property @{Name = 'NetworkLength'; Expression = {$_.Split("/")[1]}} | Select-Object -ExpandProperty NetworkLength
+    $highestNetworkLength = [Linq.Enumerable]::Min([int[]] $networkLengths)
+    if ($highestNetworkLength -ge $Length) {
       throw "You must use a Vnet of at least /$($Length+1) or larger"
     }
 
@@ -369,7 +351,7 @@ function Get-VirtualNetworkUnassignedSpace {
 
       $vnetSubnet = $_
       $subnetAddressRangeInfo = Invoke-PSipcalc -NetworkAddress $vnetSubnet.AddressPrefix
-      $subnetAddressRangeLength = $vnetAddressRangeInfo.NetworkLength
+      $subnetAddressRangeLength = $subnetAddressRangeInfo.NetworkLength
       
       if ($subnetAddressRangeLength -ge $Length) {
         # This subnet is not large enough to host a new subnet
@@ -387,9 +369,11 @@ function Get-VirtualNetworkUnassignedSpace {
         $lowestAssignedIp = [Linq.Enumerable]::Min([string[]] $assignedIPs, [Func[string,int]] { param ($ip); $ip | Convert-IPToDecimal })
         $highestAssignedIp = [Linq.Enumerable]::Max([string[]] $assignedIPs, [Func[string,int]] { param ($ip); $ip | Convert-IPToDecimal })
       }
+
+      # TODO we can also consider getting the minimum address length large enough instead than halving the space in /Length+1
      
       $lowerHalfSubnetSpace = "$subnetAddressRangeStart/$($subnetAddressRangeLength+1)"
-      $upperHalfSubnetSpace = "$((($subnetAddressRangeEnd | Convert-IPToDecimal) + 1) | Convert-DecimalToIp)/$($subnetAddressRangeLength+1)"
+      $upperHalfSubnetSpace = "$((($subnetAddressRangeStart | Convert-IPToDecimal) + [System.Math]::Pow(2, 32 - $subnetAddressRangeLength-1)) | Convert-DecimalToIp)/$($subnetAddressRangeLength+1)"
       
       if ((Invoke-PSipcalc $lowerHalfSubnetSpace -Contains $lowestAssignedIp) -and `
           (Invoke-PSipcalc $lowerHalfSubnetSpace -Contains $highestAssignedIp)) {
@@ -432,6 +416,38 @@ function Get-VirtualNetworkUnassignedSpace {
   }
 }
 
+function Get-AzDtlVirtualNetworkFromUnderlyingVnet {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Lab object to set Shared Image Gallery")]
+    [ValidateNotNullOrEmpty()]
+    $Lab,
+
+    [parameter(Mandatory=$true, HelpMessage="Id of type Microsoft.Network of the Lab Virtual Network")]
+    [ValidateNotNullOrEmpty()]
+    $VirtualNetworkId
+  )
+
+  try {
+
+    # Trying to pass through the LabUId tag is a dead end.
+    # No way to get the name of the Lab.
+  
+    # $DtlLabUId = $VirtualNetwork.Tags.GetEnumerator() | `
+    # Where-Object { $_.Key -eq "hidden-DevTestLabs-LabUId" } | `
+    # Select-Object -ExpandProperty Value -First 1
+
+    if ($VirtualNetworkId.Split("/")[6] -ine "Microsoft.Network") {
+      throw "VirtualNetworkId is not of type Microsoft.Network"
+    }
+
+    $dtlVirtualNetworkId = $VirtualNetworkId.Replace("Microsoft.Network", "microsoft.devtestlab/labs/$($Lab.Name)")
+    Get-AzResource -ResourceId $dtlVirtualNetworkId
+  } catch {
+    Write-Error -ErrorRecord $_ -EA $callerEA
+  }
+}
+
 function New-BastionHost {
   [CmdletBinding()]
   param(
@@ -445,17 +461,19 @@ function New-BastionHost {
   try {
     
     $lab = Get-AzDtlLab -ResourceGroupName $ResourceGroupName -Name $DevTestLabName
-    $vnets = $lab | Get-AzDtlVirtualNetworks -ExpandedNetwork
+    
+    # Get the underlying VNets
+    $virtualNetworks = $lab | Get-AzDtlLabVirtualNetworks -ExpandedNetwork
 
     # Try to get an address range with lenght >= 27 (smallest supported by Bastion)
-    $bastionAddressSpace = Get-VirtualNetworkUnallocatedSpace -VirtualNetwork $vnets -Length 27
-    if (!($bastionAddressSpace)) {
+    $bastionAddressSpace = Get-VirtualNetworkUnallocatedSpace -VirtualNetwork $virtualNetworks -Length 27
+    if (-not $bastionAddressSpace) {
       Write-Host "No address space to deploy a Bastion subnet of length 27"
       Write-Host "Trying to halve an existing subnet..."
 
-      # Logic for halving an existing subnet.
+      # Logic to halve an existing subnet
       # TODO should we ask permission to the user?
-      $vnetUnassignedSpace = Get-VirtualNetworkUnassignedSpace -VirtualNetwork $vnets -Length 27
+      $vnetUnassignedSpace = Get-VirtualNetworkUnassignedSpace -VirtualNetwork $virtualNetworks -Length 27
       if (!($vnetUnassignedSpace)) {
         throw "No address space or subnet to deploy a Bastion host. To proceed, please expand the Virtual Network address range."
       }
@@ -463,18 +481,26 @@ function New-BastionHost {
       $resizingVirtualNetworkSubnet = $vnetUnassignedSpace.VirtualNetworkSubnet
       $assignedAddressSpace = $vnetUnassignedSpace.AssignedSubnetSpace
       $bastionAddressSpace = $vnetUnassignedSpace.UnassignedSubnetSpace
-
-      # Update the VirtualNetwork object with a shrinked subnet
-      $vnets.Subnets | ForEach-Object {
+      
+      # Shrink the VirtualNetwork subnet to the assigned range only
+      # It does not matter which kind of subnet (e.g. 'UsedInVmCreation','UsedInPublicIpAddress')
+      $virtualNetworks.Subnets | ForEach-Object {
         if ($_.Id -eq $resizingVirtualNetworkSubnet.Id) {
           $_.AddressPrefix = $assignedAddressSpace
         }
       }
-      $vnets = Set-AzureRmVirtualNetwork -VirtualNetwork $vnets
+      $virtualNetworks = Set-AzureRmVirtualNetwork -VirtualNetwork $virtualNetworks
     }
 
-    # Shared step
-    $lab | New-AzDtlBastion -LabVirtualNetworkId $vnets.Id -BastionSubnetAddressPrefix $bastionAddressSpace
+    # Resize the address space to the minimum /27, in case we found a larger one at the previous step.
+    # TODO check limitations of having a /27 Bastion subnet. Is it 1 address per VM?
+    $bastionAddressSpace = $bastionAddressSpace.Split("/")[0] + "/27"
+
+    # Get the corresponding DTL VNet
+    $labVirtualNetworks = $lab | Convert-AzDtlVirtualNetwork -VirtualNetworkId $virtualNetworks.Id
+    
+    # Deploy the Bastion to the specific VNet address range
+    $lab | New-AzDtlBastion -LabVirtualNetworkId $labVirtualNetworks.Id -BastionSubnetAddressPrefix $bastionAddressSpace
   }
   catch {
     Write-Error -ErrorRecord $_
@@ -640,6 +666,13 @@ function Import-ConfigFile {
     # Confirm that the IpConfig is one of 3 options:
     if ($lab.IpConfig -ne "Public" -and $lab.IpConfig -ne "Shared" -and $lab.Ipconfig -ne "Private") {
         Write-Error "IpConfig either missing or incorrect for lab $($lab.DevTestLabName).  Must be 'Public', 'Private', or 'Shared'"
+    }
+
+    # Convert BastionEnabled to a boolean. If BastionEnabled property is not set, defaults to $false 
+    if ($lab.BastionEnabled) {
+      $lab.BastionEnabled = [System.Convert]::ToBoolean($lab.BastionEnabled)
+    } else {
+      $lab.BastionEnabled = $false
     }
 
     # Also add "Name" since that's used by the DTL Library for DevTestLabName

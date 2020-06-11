@@ -1618,14 +1618,58 @@ function Set-AzDtlShutdownPolicy {
   end {}
 }
 
-function Get-AzDtlVirtualNetworks {
+# Get the Virtual Network of type Microsoft.DevTestLab/labs/virtualnetworks starting from the Id of the underlying Microsoft.Network resource
+# TODO Maybe we should rename it to Get-AzDtlVirtualNetworkFromVirtualNetwork or similar?
+function Convert-AzDtlVirtualNetwork {
   [CmdletBinding()]
   param(
-    [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Lab object to set Shared Image Gallery")]
+    [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Lab object to find the attached Virtual Network")]
     [ValidateNotNullOrEmpty()]
     $Lab,
 
-    [parameter(Mandatory=$false, HelpMessage="Check underlying compute for the VNet")]
+    [parameter(Mandatory=$true, HelpMessage="Id of type Microsoft.Network of the Lab Virtual Network")]
+    [ValidateNotNullOrEmpty()]
+    [string] $VirtualNetworkId
+  )
+
+  begin {. BeginPreamble}
+  process {
+    try {
+
+      # Trying to pass through the LabUId tag is a dead end.
+      # No way to get the name of the Lab from the UId..
+    
+      # $DtlLabUId = $VirtualNetwork.Tags.GetEnumerator() | `
+      # Where-Object { $_.Key -eq "hidden-DevTestLabs-LabUId" } | `
+      # Select-Object -ExpandProperty Value -First 1
+
+      if ($VirtualNetworkId.Split("/")[6] -ine "Microsoft.Network") {
+        throw "VirtualNetworkId is not of type Microsoft.Network"
+      }
+
+      $dtlVirtualNetworkId = $VirtualNetworkId.Replace("Microsoft.Network", "microsoft.devtestlab/labs/$($Lab.Name)")
+      Get-AzResource -ResourceId $dtlVirtualNetworkId
+      
+    } catch {
+      Write-Error -ErrorRecord $_ -EA $callerEA
+    }
+  }
+  end {}
+}
+
+# Get the Virtual Network/s attached to the Lab
+function Get-AzDtlLabVirtualNetworks {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Lab object to find the attached Virtual Networks")]
+    [ValidateNotNullOrEmpty()]
+    $Lab,
+
+    [parameter(Mandatory=$false, HelpMessage="Id of type Microsoft.DevTestLab/labs/virtualnetworks of a Lab Virtual Network. If none, get all the attached Virtual Networks.")]
+    [ValidateNotNullOrEmpty()]
+    [string] $LabVirtualNetworkId = "",
+
+    [parameter(Mandatory=$false, HelpMessage="If set, get the underlying Microsoft.Network resource")]
     [Switch]
     $ExpandedNetwork
   )
@@ -1635,19 +1679,38 @@ function Get-AzDtlVirtualNetworks {
     try {
       $Lab | ForEach-Object {
 
-        $labVNets = Get-AzureRmResource `
-                      -ResourceGroupName $_.ResourceGroupName `
-                      -ResourceType Microsoft.DevTestLab/labs/virtualnetworks `
-                      -ResourceName $_.Name `
-                      -ApiVersion 2018-09-15
+        if ($LabVirtualNetworkId) {
 
-        if ($ExpandedNetwork) {
-          $labVNets | ForEach-Object {
-            Get-AzureRmVirtualNetwork -ResourceGroupName $_.ResourceGroupName -Name $_.Name
-          }   
+          if ($LabVirtualNetworkId.Split("/")[6] -ine "microsoft.devtestlab") {
+            throw "VirtualNetworkId is not of type Microsoft.DevTestLab/labs/virtualnetworks"
+          }
+          
+          if ($ExpandedNetwork) {
+
+            $virtualNetworkId = $LabVirtualNetworkId.Replace("microsoft.devtestlab/labs/$($Lab.Name)", "Microsoft.Network")
+            Get-AzureRmVirtualNetwork -ResourceGroupName $virtualNetworkId.Split("/")[4] -Name $virtualNetworkId.Split("/")[8]
+          
+          } else {
+            Get-AzureRmResource -ResourceId $LabVirtualNetworkId
+          }
+
         }
-        else { 
-          return $labVNets
+        else {
+
+          $labVirtualNetworks = Get-AzureRmResource `
+            -ResourceGroupName $_.ResourceGroupName `
+            -ResourceType Microsoft.DevTestLab/labs/virtualnetworks `
+            -ResourceName $_.Name `
+            -ApiVersion 2018-09-15
+
+          if ($ExpandedNetwork) {
+            $labVirtualNetworks | ForEach-Object {
+              Get-AzureRmVirtualNetwork -ResourceGroupName $_.ResourceGroupName -Name $_.Name
+            }  
+          }
+          else {
+            $labVirtualNetworks
+          }
         }
       }
     } catch {
@@ -1657,44 +1720,55 @@ function Get-AzDtlVirtualNetworks {
   end {}
 }
 
-function Get-AzDtlVirtualNetworkSubnets {
+# Get the Subnets of the attached Virtual Network
+function Get-AzDtlLabVirtualNetworkSubnets {
   [CmdletBinding()]
   param(
-    [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="A Virtual network attached to the Lab (type: Microsoft.DevTestLab/labs/virtualnetworks)")]
+    [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Lab object to find the attached Virtual Network subnets")]
     [ValidateNotNullOrEmpty()]
-    $VirtualNetwork,
+    $Lab,
 
-    [parameter(Mandatory=$false, HelpMessage="Filter by type of DevTestLab VNet")]
+    [parameter(Mandatory=$true, ValueFromPipeline=$false, HelpMessage="Id of type Microsoft.DevTestLab/labs/virtualnetworks of a Lab Virtual Network")]
+    [ValidateNotNullOrEmpty()]
+    [string] $LabVirtualNetworkId,
+
+    [parameter(Mandatory=$false, ValueFromPipeline=$false, HelpMessage="Filter by type of DTL Subnet")]
     [ValidateSet('All','UsedInVmCreation','UsedInPublicIpAddress')]
-    [string]
-    $SubnetKind = 'All'
+    [string] $SubnetKind = 'All'
   )
 
   begin {. BeginPreamble}
   process {
     try {
-        $VirtualNetwork | Foreach-Object {
+
+        $LabVirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetworkId
+        $LabVirtualNetwork | Foreach-Object {
           $_.Properties.subnetOverrides | Foreach-Object {
 
             if ($SubnetKind -eq 'All') {
-              Get-AzureRmResource -ResourceId $_.resourceId
+              Get-AzureRmResource -ResourceId $_.ResourceId
             }
             else {
               if ($SubnetKind -eq 'UsedInVmCreation' -and $_.useInVmCreationPermission -eq "Allow") {
-                Get-AzureRmResource -ResourceId $_.resourceId
+                Get-AzureRmResource -ResourceId $_.ResourceId
               }
               elseif ($SubnetKind -eq 'UsedInPublicIpAddress' -and $_.usePublicIpAddressPermission -eq "Allow") {
-                Get-AzureRmResource -ResourceId $_.resourceId
+                Get-AzureRmResource -ResourceId $_.ResourceId
               }
             }
           }
         }
     } catch {
+
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
   }
   end {}
 }
+
+# LabVirtualNetwork =  DTL VNet type
+# VirtualNetwork = Std VNet type
+# Deploy an Azure Bastion host to Lab Virtual Network
 function New-AzDtlBastion {
   [CmdletBinding()]
   param(
@@ -1702,10 +1776,9 @@ function New-AzDtlBastion {
     [ValidateNotNullOrEmpty()]
     $Lab,
 
-    [parameter(Mandatory=$false,HelpMessage="Id of the Virtual Network used in VM creation. If you are using an existing virtual network, make sure the existing virtual network has enough free address space to accommodate the Bastion subnet requirements. Defaults to the only VNet, if there is one.")]
+    [parameter(Mandatory=$false,HelpMessage="Id of type Microsoft.DevTestLab/labs/virtualnetworks of the Lab Virtual Network used in VM creation. Defaults to the VNet with VMs creation enabled, if there is only one. If you are using an existing virtual network, make sure the existing virtual network has enough free address space to accommodate the Bastion subnet requirements.")]
     [ValidateNotNullOrEmpty()]
-    [string]
-    $LabVirtualNetworkId = "",
+    [string] $LabVirtualNetworkId = "",
 
     [parameter(Mandatory=$true,HelpMessage="IP address prefix (CIDR notation) where to deploy the Bastion host")]
     [ValidateNotNullOrEmpty()]
@@ -1716,70 +1789,81 @@ function New-AzDtlBastion {
   process {
     try {
 
+      if ($LabVirtualNetworkId.Split("/")[6] -ine "microsoft.devtestlab") {
+        throw "VirtualNetworkId is not of type Microsoft.DevTestLab/labs/virtualnetworks"
+      }
+
       $CIDRIPv4Regex = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(3[0-2]|[1-2][0-9]|[0-9]))$"
-      if (!($AddressPrefix -match $CIDRIPv4Regex)) {
+      if (!($BastionSubnetAddressPrefix -match $CIDRIPv4Regex)) {
         throw "Not a valid CIDR IPv4 address range"
       }
 
-      if ($AddressPrefix.Split("/")[1] -gt 27) {
+      if ($BastionSubnetAddressPrefix.Split("/")[1] -gt 27) {
         throw "You must use a subnet of at least /27 or larger (26,25...)"
       }
 
-      # Get again the lab in case Get-AzDtlLab was not used
+      # Get again the lab just in case the preview API was not used
       $Lab = $Lab | Get-AzDtlLab
-      if ($LabVirtualNetworkId) {
-        $VirtualNetwork = Get-AzResource -ResourceId $LabVirtualNetworkId -ResourceType Microsoft.DevTestLab/labs/virtualnetworks
-      }
-      else {
-        $VirtualNetwork = $Lab | Get-AzDtlVirtualNetworks
-      }
 
-      # In the underlying Lab VNet, look for a subnet supporting VMs creation.
-      # If 0 or >1 VNet is found, we cannot deploy the Bastion
-      $VirtualNetwork = $VirtualNetwork | Where-Object {
-        $subnets = $_ | Get-AzDtlVirtualNetworkSubnets -SubnetKind 'UsedInVmCreation'
+      # If LabVirtualNetworkId is not set, we may find more than 1 VNet.
+      # It is okay, provided that only 1 VNet has a subnet supporting VMs creations.
+      # Otherwise can cause confusion for the caller on which one to pick during the VM creation step.
+      # TODO As of now Bastion does not support peered VNets in hub-spoke topologies.
+      # Once this is supported, we can deploy a Bastion to 1 VNet
+      # and the other VNets will be able to host VMs enabled for browser connection
+      # without furtherly creating their own Bastion subnet.
+      $LabVirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetworkId
+
+      # In the Lab VNets, look for an underlying subnet supporting VMs creation.
+      # If 0 or > 1 VNet is found, we don't deploy the Bastion (today)
+      $LabVirtualNetwork = $LabVirtualNetwork | Where-Object {
+        $subnets = $Lab | Get-AzDtlLabVirtualNetworkSubnets -LabVirtualNetworkId $_.ResourceId -SubnetKind 'UsedInVmCreation'
         if ($subnets) {
           return $_
         }
       }
 
-      # TODO If VNet > 1, we don't know which one to pick. Should we ask the user?
-      if ($null -eq $vnets -or ($vnets -is [array] -and $vnets.Count -ne 1)) {
-        throw "DevTest Labs currently supports deploying a Bastion in only 1 VNet enabled for VM creation."
+      if ($null -eq $LabVirtualNetwork -or ($LabVirtualNetwork -is [array] -and $LabVirtualNetwork.Count -ne 1)) {
+        throw "DTL library currently supports deploying a Bastion in a Lab with only 1 VNet enabled for VM creation"
       }
 
       # Make sure to get the underlying VNet for this Lab
-      $VirtualNetwork = $VirtualNetwork | Get-AzVirtualNetwork -ExpandResource
+      $VirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetwork.ResourceId -ExpandedNetwork
 
-      # Try create a subnet in this address range
-      Add-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $VirtualNetwork -Name "AzureBastionSubnet" -AddressPrefix $AddressPrefix
+      # Try to create a new subnet named 'AzureBastionSubnet' in this address range
+      $VirtualNetwork = Add-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $VirtualNetwork -Name "AzureBastionSubnet" -AddressPrefix $BastionSubnetAddressPrefix
       $VirtualNetwork = Set-AzureRmVirtualNetwork -VirtualNetwork $VirtualNetwork
 
-      # Ip has to be in the same region of Bastion
+      # IP must be in the same region of the Bastion
       $bastionPublicIpAddress =
               New-AzPublicIpAddress `
-                  -ResourceGroupName $lab.ResourceGroupName `
-                  -Name "$($lab.Name)PublicIP" `
-                  -Location $lab.Location `
+                  -ResourceGroupName $Lab.ResourceGroupName `
+                  -Name "$($Lab.Name)PublicIP" `
+                  -Location $Lab.Location `
                   -AllocationMethod "Static" `
                   -Sku "Standard"
 
+      # Deploy the Bastion
       New-AzBastion `
-          -ResourceGroupName $lab.ResourceGroupName `
-          -Name "$($lab.Name)Bastion" `
+          -ResourceGroupName $Lab.ResourceGroupName `
+          -Name "$($Lab.Name)Bastion" `
           -PublicIpAddress $bastionPublicIpAddress `
           -VirtualNetwork $VirtualNetwork
 
-      # Must set the browserConnect property to enabled using preview Api Version
-      $lab.Properties.browserConnect = "Enabled"
+      # Make sure BrowserConnect property for the Lab is set to enabled
+      # Must use the Preview API
+      if ($Lab.Properties.browserConnect -ne "Enabled") {
 
-      Set-AzureRmResource `
-        -ResourceId $lab.ResourceId `
-        -ApiVersion 2018-10-15-preview `
-        -Properties $lab.Properties `
-        -Force | Out-Null
+        $Lab.Properties.browserConnect = "Enabled"
+        Set-AzureRmResource `
+          -ResourceId $Lab.ResourceId `
+          -ApiVersion 2018-10-15-preview `
+          -Properties $Lab.Properties `
+          -Force | Out-Null
+      }
 
-      $lab | Get-AzDtlLab
+      # Return the updated lab
+      $Lab | Get-AzDtlLab
     }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
@@ -3815,8 +3899,9 @@ New-Alias -Name 'UnClaim-AzureRmDtlVm'    -Value Invoke-AzDtlVmUnClaim
 New-Alias -Name 'Dtl-NewEnvironment'      -Value New-AzDtlLabEnvironment
 New-Alias -Name 'Dtl-GetEnvironment'      -Value Get-AzDtlLabEnvironment
 
-New-Alias -Name 'Dtl-GetVirtualNetworks'  -Value Get-AzDtlVirtualNetworks
-New-Alias -Name 'Dtl-GetVirtualNetworkSubnets'  -Value Get-AzDtlVirtualNetworkSubnets
+New-Alias -Name 'Dtl-GetVirtualNetwork'  -Value Convert-AzDtlVirtualNetwork
+New-Alias -Name 'Dtl-GetVirtualNetworks'  -Value Get-AzDtlLabVirtualNetworks
+New-Alias -Name 'Dtl-GetVirtualNetworkSubnets'  -Value Get-AzDtlLabVirtualNetworkSubnets
 
 New-Alias -Name 'Dtl-NewBastion'          -Value New-AzDtlBastion
 
@@ -3863,8 +3948,9 @@ Export-ModuleMember -Function New-AzDtlLab,
                               Import-AzDtlCustomImageFromUri,
                               Get-AzDtlCustomImage,
                               New-AzDtlCustomImageFromVm,
-                              Get-AzDtlVirtualNetworks,
-                              Get-AzDtlVirtualNetworkSubnets,
+                              Convert-AzDtlVirtualNetwork,
+                              Get-AzDtlLabVirtualNetworks,
+                              Get-AzDtlLabVirtualNetworkSubnets,
                               New-AzDtlBastion
 
 Export-ModuleMember -Alias *
