@@ -6,6 +6,9 @@ param
     [Parameter(Mandatory=$true, HelpMessage="The Name of the resource group")]
     [string] $ResourceGroupName,
 
+    [parameter(Mandatory=$true, HelpMessage="Public=separate IP Address, Shared=load balancers optimizes IP Addresses, Private=No public IP address.")]
+    [string] $LabIpConfig,
+    
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$true, HelpMessage="The Name of the Shared Image Gallery attached to the lab")]
     [string] $SharedImageGalleryName,
@@ -55,6 +58,8 @@ foreach($descr in $VmSettings) {
                               -StorageType $descr.storageType `
                               -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
                               -Notes $descr.description `
+                              -OsType $descr.osType `
+                              -IpConfig $LabIpConfig `
                               -AsJob
 
   Start-Sleep -Seconds 60
