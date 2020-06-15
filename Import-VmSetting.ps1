@@ -26,7 +26,13 @@ if ($PSCmdlet.ParameterSetName -eq "Storage") {
     $SourceStorageContext = New-AzStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $StorageAccountKey
 
     $jsonBlobs = Get-AzStorageBlob -Context $SourceStorageContext -Container $StorageContainerName -Blob '*json'
-    Write-Host "Downloading $($jsonBlobs.Count) json files from storage account"
+    $jsonBlobsCount = ($jsonBlobs | Measure-Object).Count
+    if ($jsonBlobsCount -eq 0) {
+        throw "Unable to continue, storage account doesn't contain any JSON definition files..."
+    }
+
+
+    Write-Host "Downloading $jsonBlobsCount json files from storage account"
 
     $downloadFolder = Join-Path $env:TEMP 'CustomImageDownloads'
     if(Test-Path -Path $downloadFolder)
@@ -43,6 +49,22 @@ if ($PSCmdlet.ParameterSetName -eq "Storage") {
     {
         $imageObj = (Get-Content $file.FullName -Raw) | ConvertFrom-Json
         $imageObj.timestamp = [DateTime]::Parse($imageObj.timestamp)
+
+        # If VM Setting doesn't have osstate - specify specialized to maintain backward compatability
+        if (-not ("osstate" -in $imageObj.PSObject.Properties.Name)) {
+            Add-Member -InputObject $imageObj -MemberType NoteProperty -Name osstate -Value "Specialized"
+        }
+
+        # If VM Setting doesn't have hypervgeneration - specify v1 to maintain backward compatability
+        if (-not ("hypervgeneration" -in $imageObj.PSObject.Properties.Name)) {
+            Add-Member -InputObject $imageObj -MemberType NoteProperty -Name hypervgeneration -Value "V1"
+        }
+
+        # If VM Setting doesn't have publisher - specify custom to maintain backward compatability
+        if (-not ("publisher" -in $imageObj.PSObject.Properties.Name)) {
+            Add-Member -InputObject $imageObj -MemberType NoteProperty -Name publisher -Value "Custom"
+        }
+
         Add-Member -InputObject $imageObj -MemberType NoteProperty -Name sourceVhdUri -Value "$($SourceStorageContext.BlobEndPoint)$StorageContainerName/$($imageObj.vhdFileName)"
         $sourceImageInfos += $imageObj
     }
