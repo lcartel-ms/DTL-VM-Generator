@@ -54,8 +54,7 @@ $config | ForEach-Object {
     if (-not $SharedImageGallery) {
         Throw "Unable to update lab '$($_.Name)', '$($_.SharedImageGalleryName)' shared image gallery does not exist."
     }
-
-    Set-AzDtlLabSharedImageGallery -Lab $_ -Name $_.SharedImageGalleryName -ResourceId $SharedImageGallery.Id
+    $_ | Get-AzDtlLab | Set-AzDtlLabSharedImageGallery -Name $_.SharedImageGalleryName -ResourceId $SharedImageGallery.Id
 }
 
 # Update the IP Policy on the labs
