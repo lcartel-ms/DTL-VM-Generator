@@ -1687,7 +1687,7 @@ function Get-AzDtlLabVirtualNetworks {
           
           if ($ExpandedNetwork) {
 
-            $virtualNetworkId = $LabVirtualNetworkId.Replace("microsoft.devtestlab/labs/$($Lab.Name)", "Microsoft.Network")
+            $virtualNetworkId = $LabVirtualNetworkId -ireplace [regex]::Escape("microsoft.devtestlab/labs/$($Lab.Name)"), "Microsoft.Network"
             Get-AzureRmVirtualNetwork -ResourceGroupName $virtualNetworkId.Split("/")[4] -Name $virtualNetworkId.Split("/")[8]
           
           } else {
@@ -1855,8 +1855,11 @@ function New-AzDtlBastion {
       New-AzBastion `
           -ResourceGroupName $Lab.ResourceGroupName `
           -Name "$($Lab.Name)Bastion" `
-          -PublicIpAddress $bastionPublicIpAddress `
-          -VirtualNetwork $VirtualNetwork
+          -PublicIpAddressRgName $bastionPublicIpAddress.ResourceGroupName `
+          -PublicIpAddressName $bastionPublicIpAddress.Name `
+          -VirtualNetworkRgName $VirtualNetwork.ResourceGroupName `
+          -VirtualNetworkName $VirtualNetwork.Name `
+
       Write-Host "Azure Bastion resource successfully created"
 
       # Make sure BrowserConnect property for the Lab is set to enabled
@@ -3914,7 +3917,7 @@ New-Alias -Name 'UnClaim-AzureRmDtlVm'    -Value Invoke-AzDtlVmUnClaim
 New-Alias -Name 'Dtl-NewEnvironment'      -Value New-AzDtlLabEnvironment
 New-Alias -Name 'Dtl-GetEnvironment'      -Value Get-AzDtlLabEnvironment
 
-New-Alias -Name 'Dtl-GetVirtualNetwork'  -Value Convert-AzDtlVirtualNetwork
+New-Alias -Name 'Dtl-ConvertVirtualNetwork'  -Value Convert-AzDtlVirtualNetwork
 New-Alias -Name 'Dtl-GetVirtualNetworks'  -Value Get-AzDtlLabVirtualNetworks
 New-Alias -Name 'Dtl-GetVirtualNetworkSubnets'  -Value Get-AzDtlLabVirtualNetworkSubnets
 
