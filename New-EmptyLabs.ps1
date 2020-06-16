@@ -41,8 +41,8 @@ $labCreateJobs = $config | ForEach-Object {
                            }
 Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
 
-$configBastion = $config | Where-Object { $_.BastionEnabled -eq $true }
-if ($configBastion.Count -gt 0) {
+$configBastion = [Array] ($config | Where-Object { $_.BastionEnabled -eq $true })
+if (($configBastion | Measure-Object).Count -gt 0) {
     # Deploy the Azure Bastion hosts to the labs
     Write-Host "---------------------------------" -ForegroundColor Green
     Write-Host "Deploying $($configBastion.Count) Bastion hosts to the labs..." -ForegroundColor Green
