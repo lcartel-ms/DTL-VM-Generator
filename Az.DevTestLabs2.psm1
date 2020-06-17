@@ -1687,7 +1687,7 @@ function Get-AzDtlLabVirtualNetworks {
           
           if ($ExpandedNetwork) {
 
-            $virtualNetworkId = $LabVirtualNetworkId -ireplace [regex]::Escape("microsoft.devtestlab/labs/$($Lab.Name)"), "Microsoft.Network"
+            $virtualNetworkId = $LabVirtualNetworkId -ireplace "microsoft.devtestlab/labs/$($Lab.Name)", "Microsoft.Network"
             Get-AzureRmVirtualNetwork -ResourceGroupName $virtualNetworkId.Split("/")[4] -Name $virtualNetworkId.Split("/")[8]
           
           } else {
