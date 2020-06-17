@@ -22,12 +22,12 @@ $AzDtlModuleName = "Az.DevTestLabs2"
 $AzDtlModuleSource = "https://raw.githubusercontent.com/Azure/azure-devtestlab/master/samples/DevTestLabs/Modules/Library/Az.DevTestLabs2.psm1"
 
 # To be passed as 'ModulesToImport' param when starting a RSJob
-$global:AzDtlModulePath = Join-Path -Path (Resolve-Path ./) -ChildPath $AzDtlModuleName
+$global:AzDtlModulePath = Join-Path -Path (Resolve-Path ./) -ChildPath "$AzDtlModuleName.psm1"
 
 # PSipcalc script dependency
 $PSipcalcSource = "https://raw.githubusercontent.com/EliteLoser/PSipcalc/master/PSipcalc.ps1"
-$PSipcalcName = "PSipcalc.ps1"
-$PSipcalcScriptPath = Join-Path -Path (Resolve-Path ./) -ChildPath $PSipcalcName
+$PSipcalcName = "PSipcalc"
+$PSipcalcScriptPath = Join-Path -Path (Resolve-Path ./) -ChildPath "$PSipcalcName.ps1"
 $PSipcalcAliasName = "Invoke-PSipcalc"
 
 function Import-RemoteModule {
@@ -85,7 +85,7 @@ function Remove-AzDtlModule {
    Remove-Module -Name $AzDtlModuleName -ErrorAction SilentlyContinue
 }
 function Import-PsipcalcScript {
-  Import-RemoteScript -Source $PSipcalcSource -ScriptName $PSipcalcName -AliasName $PSipcalcAliasName 
+  Import-RemoteScript -Source $PSipcalcSource -ScriptName "$PSipcalcName.ps1" -AliasName $PSipcalcAliasName 
 }
 function Remove-PsipcalcScript {
   Remove-Item -Path $PSipcalcScriptPath
