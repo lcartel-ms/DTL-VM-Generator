@@ -1824,7 +1824,10 @@ function New-AzDtlBastion {
 
     [parameter(Mandatory=$true,HelpMessage="IP address prefix (CIDR notation) where to deploy the Bastion host")]
     [ValidateNotNullOrEmpty()]
-    [string] $BastionSubnetAddressPrefix
+    [string] $BastionSubnetAddressPrefix,
+
+    [parameter(Mandatory=$false,HelpMessage="Run the command in a separate job.")]
+    [switch] $AsJob = $false
   )
 
   begin {. BeginPreamble}
@@ -1844,72 +1847,98 @@ function New-AzDtlBastion {
         throw "You must use a subnet of at least /27 or larger (26,25...)"
       }
 
-      # Get again the lab just in case the preview API was not used
-      $Lab = $Lab | Get-AzDtlLab
+      $sb = {
+        param($Lab, $LabVirtualNetworkId, $BastionSubnetAddressPrefix, $workingDir, $justAz)
 
-      # If LabVirtualNetworkId is not set, we may find more than 1 VNet.
-      # It is okay, provided that only 1 VNet has a subnet supporting VMs creations.
-      # Otherwise can cause confusion for the caller on which one to pick during the VM creation step.
-      # TODO As of now Bastion does not support peered VNets in hub-spoke topologies.
-      # Once this is supported, we can deploy a Bastion to 1 VNet
-      # and the other VNets will be able to host VMs enabled for browser connection
-      # without furtherly creating their own Bastion subnet.
-      Write-Host "Retrieving the attached Virtual Network where to deploy the Azure Bastion"
-      $LabVirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetworkId
-      $LabVirtualNetworkId = $LabVirtualNetwork.ResourceId
+        if($justAz) {
+          Enable-AzureRmAlias -Scope Local -Verbose:$false
+          # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
+          $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+          $Mutex.WaitOne() | Out-Null
+          Enable-AzContextAutosave -Scope Process | Out-Null
+          $rg = Get-AzResourceGroup | Out-Null
+          $Mutex.ReleaseMutex() | Out-Null
+        }
 
-      # In the Lab VNets, look for an underlying subnet supporting VMs creation.
-      # If 0 or > 1 VNet is found, we don't deploy the Bastion (today)
-      $LabVirtualNetwork = $LabVirtualNetwork | Where-Object {
-        $subnets = $Lab | Get-AzDtlLabVirtualNetworkSubnets -LabVirtualNetworkId $_.ResourceId -SubnetKind 'UsedInVmCreation'
-        if ($subnets) {
-          return $_
+        # Import again the module
+        Import-Module "$workingDir\Az.DevTestLabs2.psm1"
+
+        # Get again the lab just in case the preview API was not used
+        $Lab = $Lab | Get-AzDtlLab
+
+        # If LabVirtualNetworkId is not set, we may find more than 1 VNet.
+        # It is okay, provided that only 1 VNet has a subnet supporting VMs creations.
+        # Otherwise can cause confusion for the caller on which one to pick during the VM creation step.
+        # TODO As of now Bastion does not support peered VNets in hub-spoke topologies.
+        # Once this is supported, we can deploy a Bastion to 1 VNet
+        # and the other VNets will be able to host VMs enabled for browser connection
+        # without furtherly creating their own Bastion subnet.
+        Write-Host "Retrieving the attached Virtual Network where to deploy the Azure Bastion"
+        $LabVirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetworkId
+        $LabVirtualNetworkId = $LabVirtualNetwork.ResourceId
+
+        # In the Lab VNets, look for an underlying subnet supporting VMs creation.
+        # If 0 or > 1 VNet is found, we don't deploy the Bastion (today)
+        $LabVirtualNetwork = $LabVirtualNetwork | Where-Object {
+          $subnets = $Lab | Get-AzDtlLabVirtualNetworkSubnets -LabVirtualNetworkId $_.ResourceId -SubnetKind 'UsedInVmCreation'
+          if ($subnets) {
+            return $_
+          }
+        }
+
+        if ($null -eq $LabVirtualNetwork -or ($LabVirtualNetwork -is [array] -and $LabVirtualNetwork.Count -ne 1)) {
+          throw "DTL library currently supports deploying a Bastion in a Lab with only 1 VNet enabled for VM creation"
+        }
+
+        # Make sure to get the underlying VNet for this Lab
+        Write-Host "Retrieving the underlying attached Virtual Network used to deploy the Azure Bastion"
+        $VirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetwork.ResourceId -ExpandedNetwork
+
+        # TODO Skip this step if there is already a subnet named 'AzureBastionSubnet'
+        # Try to create a new subnet named 'AzureBastionSubnet' in this address range
+        Write-Host "Adding a subnet 'AzureBastionSubnet' at $BastionSubnetAddressPrefix"
+        $VirtualNetwork = Add-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $VirtualNetwork -Name "AzureBastionSubnet" -AddressPrefix $BastionSubnetAddressPrefix
+        $VirtualNetwork = Set-AzureRmVirtualNetwork -VirtualNetwork $VirtualNetwork
+        Write-Host "Subnet 'AzureBastionSubnet' successfully added to the Virtual Network"
+
+        # IP must be in the same region of the Bastion
+        Write-Host "Creating a Public IP address for the Bastion host"
+        $bastionPublicIpAddress =
+                New-AzureRmPublicIpAddress `
+                    -ResourceGroupName $Lab.ResourceGroupName `
+                    -Name "$($Lab.Name)BastionPublicIP" `
+                    -Location $Lab.Location `
+                    -AllocationMethod "Static" `
+                    -Sku "Standard"
+        Write-Host "Bastion Public IP address successfully created at $($bastionPublicIpAddress.IpAddress)"
+
+        # Deploy the Bastion
+        Write-Host "Creating the Bastion resource"
+        New-AzBastion `
+            -ResourceGroupName $Lab.ResourceGroupName `
+            -Name "$($Lab.Name)Bastion" `
+            -PublicIpAddressRgName $bastionPublicIpAddress.ResourceGroupName `
+            -PublicIpAddressName $bastionPublicIpAddress.Name `
+            -VirtualNetworkRgName $VirtualNetwork.ResourceGroupName `
+            -VirtualNetworkName $VirtualNetwork.Name `
+
+        Write-Host "Azure Bastion resource successfully created"
+
+        $Lab = $Lab | Set-AzDtlLabBrowserConnect -BrowserConnect 'Enabled'
+
+        # Return the newly created Bastion
+        Write-Host "Returning the Bastion"
+        $Lab | Get-AzDtlBastion -LabVirtualNetworkId $LabVirtualNetworkId
+      }
+      foreach($l in $Lab) {
+        if($AsJob.IsPresent) {
+          Start-Job      -ScriptBlock $sb -ArgumentList $l, $LabVirtualNetworkId, $BastionSubnetAddressPrefix, $PWD, $justAz
+        } else {
+          Invoke-Command -ScriptBlock $sb -ArgumentList $l, $LabVirtualNetworkId, $BastionSubnetAddressPrefix, $PWD, $justAz
         }
       }
 
-      if ($null -eq $LabVirtualNetwork -or ($LabVirtualNetwork -is [array] -and $LabVirtualNetwork.Count -ne 1)) {
-        throw "DTL library currently supports deploying a Bastion in a Lab with only 1 VNet enabled for VM creation"
-      }
-
-      # Make sure to get the underlying VNet for this Lab
-      Write-Host "Retrieving the underlying attached Virtual Network used to deploy the Azure Bastion"
-      $VirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetwork.ResourceId -ExpandedNetwork
-
-      # TODO Skip this step if there is already a subnet named 'AzureBastionSubnet'
-      # Try to create a new subnet named 'AzureBastionSubnet' in this address range
-      Write-Host "Adding a subnet 'AzureBastionSubnet' at $BastionSubnetAddressPrefix"
-      $VirtualNetwork = Add-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $VirtualNetwork -Name "AzureBastionSubnet" -AddressPrefix $BastionSubnetAddressPrefix
-      $VirtualNetwork = Set-AzureRmVirtualNetwork -VirtualNetwork $VirtualNetwork
-      Write-Host "Subnet 'AzureBastionSubnet' successfully added to the Virtual Network"
-
-      # IP must be in the same region of the Bastion
-      Write-Host "Creating a Public IP address for the Bastion host"
-      $bastionPublicIpAddress =
-              New-AzureRmPublicIpAddress `
-                  -ResourceGroupName $Lab.ResourceGroupName `
-                  -Name "$($Lab.Name)BastionPublicIP" `
-                  -Location $Lab.Location `
-                  -AllocationMethod "Static" `
-                  -Sku "Standard"
-      Write-Host "Bastion Public IP address successfully created at $($bastionPublicIpAddress.IpAddress)"
-
-      # Deploy the Bastion
-      Write-Host "Creating the Bastion resource"
-      New-AzBastion `
-          -ResourceGroupName $Lab.ResourceGroupName `
-          -Name "$($Lab.Name)Bastion" `
-          -PublicIpAddressRgName $bastionPublicIpAddress.ResourceGroupName `
-          -PublicIpAddressName $bastionPublicIpAddress.Name `
-          -VirtualNetworkRgName $VirtualNetwork.ResourceGroupName `
-          -VirtualNetworkName $VirtualNetwork.Name `
-
-      Write-Host "Azure Bastion resource successfully created"
-
-      $Lab = $Lab | Set-AzDtlLabBrowserConnect -BrowserConnect 'Enabled'
-
-      # Return the newly created Bastion
-      Write-Host "Returning the Bastion"
-      $Lab | Get-AzDtlBastion -LabVirtualNetworkId $LabVirtualNetworkId
+      # Set-Location `$Using:PWD
     }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
@@ -1952,6 +1981,8 @@ function Get-AzDtlBastion {
         }
       }
 
+      # Trace back the Bastion host from the assigned IPConfig
+      # Look for an IP Configuration of type Microsoft.Network/bastionHosts
       $ipConfigBastions = [Array] $bastionSubnet.IpConfigurations | Where-Object {
         ("$($_.Id.Split("/")[6])/$($_.Id.Split("/")[7])" -eq "Microsoft.Network/bastionHosts")
       }
@@ -1984,8 +2015,11 @@ function Remove-AzDtlBastion {
     [ValidateNotNullOrEmpty()]
     $Lab,
 
-    [parameter(Mandatory=$false,HelpMessage="Id of type Microsoft.DevTestLab/labs/virtualnetworks of the Lab Virtual Network used for Bastion. Deafults to the 1 and only VNet that has an Azure Bastion Subnet.")]
-    [string] $LabVirtualNetworkId = ""
+    [parameter(Mandatory=$false,HelpMessage="Id of type Microsoft.DevTestLab/labs/virtualnetworks of the Lab Virtual Network used for Bastion. If there is only 1 VNet with an AzureBastionSubnet, it defaults to this one.")]
+    [string] $LabVirtualNetworkId = "",
+
+    [parameter(Mandatory=$false,HelpMessage="Run the command in a separate job.")]
+    [switch] $AsJob = $false
   )
 
   begin {. BeginPreamble}
@@ -1996,36 +2030,58 @@ function Remove-AzDtlBastion {
         throw "VirtualNetworkId is not of type Microsoft.DevTestLab/labs/virtualnetworks"
       }
 
-      $Lab = $Lab | Get-AzDtlLab
-      $bastion = $Lab | Get-AzDtlBastion -LabVirtualNetworkId $LabVirtualNetworkId
+      $sb = {
+        param($Lab, $LabVirtualNetworkId, $workingDir, $justAz)
 
-      Write-Host "Removing the bastion '$($bastion.Name)'."
-      $bastion | Remove-AzBastion -Force
-
-      $VirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetworkId -ExpandedNetwork
-
-      $bastion.IpConfigurations | ForEach-Object {
-
-        if ($_.PublicIpAddress) {
-          Write-Host "Removing the Public Ip Address assigned to the Azure Bastion 'AzureBastionSubnet'."
-          Remove-AzureRmResource -ResourceId $_.PublicIpAddress.Id -Force
+        if($justAz) {
+          Enable-AzureRmAlias -Scope Local -Verbose:$false
+          # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
+          $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+          $Mutex.WaitOne() | Out-Null
+          Enable-AzContextAutosave -Scope Process | Out-Null
+          $rg = Get-AzResourceGroup | Out-Null
+          $Mutex.ReleaseMutex() | Out-Null
         }
 
-        if ($_.Subnet) {
-          Write-Host "Removing the subnet 'AzureBastionSubnet'."
-          $bastionSubnet = Get-AzureRmResource -ResourceId $_.Subnet.Id
-          Remove-AzureRmVirtualNetworkSubnetConfig -Name $bastionSubnet.Name -VirtualNetwork $VirtualNetwork
-          $VirtualNetwork | Set-AzureRmVirtualNetwork
+        # Import again the module
+        Import-Module "$workingDir\Az.DevTestLabs2.psm1"
+
+        $Lab = $Lab | Get-AzDtlLab
+        $bastion = $Lab | Get-AzDtlBastion -LabVirtualNetworkId $LabVirtualNetworkId
+  
+        Write-Host "Removing the bastion '$($bastion.Name)'."
+        $bastion | Remove-AzBastion -Force
+  
+        $VirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetworkId -ExpandedNetwork
+  
+        $bastion.IpConfigurations | ForEach-Object {
+  
+          if ($_.PublicIpAddress) {
+            Write-Host "Removing the Public Ip Address assigned to the Azure Bastion 'AzureBastionSubnet'."
+            Remove-AzureRmResource -ResourceId $_.PublicIpAddress.Id -Force
+          }
+  
+          if ($_.Subnet) {
+            Write-Host "Removing the subnet 'AzureBastionSubnet'."
+            $bastionSubnet = Get-AzureRmResource -ResourceId $_.Subnet.Id
+            Remove-AzureRmVirtualNetworkSubnetConfig -Name $bastionSubnet.Name -VirtualNetwork $VirtualNetwork
+            $VirtualNetwork | Set-AzureRmVirtualNetwork
+          }
         }
+
+        $Lab | Set-AzDtlLabBrowserConnect -BrowserConnect 'Disabled' | Out-Null
       }
 
-      $Lab | Set-AzDtlLabBrowserConnect -BrowserConnect 'Disabled' | Out-Null
-      
-      return $true
+      foreach($l in $Lab) {
+        if($AsJob.IsPresent) {
+          Start-Job      -ScriptBlock $sb -ArgumentList $l, $LabVirtualNetworkId, $PWD, $justAz
+        } else {
+          Invoke-Command -ScriptBlock $sb -ArgumentList $l, $LabVirtualNetworkId, $PWD, $justAz
+        }
+      }
     }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
-      return $false
     }
   }
   end {}
