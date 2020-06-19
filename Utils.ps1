@@ -444,3 +444,20 @@ function Invoke-RSForEachLab {
 
   Wait-RSJobWithProgress -secTimeout $secTimeout -jobs $jobs
 }
+
+function Get-RandomString {
+    param(
+    [Parameter(Mandatory)]
+    #Joining together a..z and A..Z we have exactly 52 characters to choose from
+    [ValidateRange(0, 52)]
+    [byte]$length
+    )
+    #Set ASCII boundaries for letter generation
+    $lowercaseA = 65
+    $lowercaseZ = 90
+    $uppercaseA = 97
+    $uppercaseZ = 122
+    return -join (($lowercaseA..$lowercaseZ) + ($uppercaseA..$uppercaseZ) `
+      | Get-Random -Count $length `
+      | ForEach-Object {[char]$_})
+}
