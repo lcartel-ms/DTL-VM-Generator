@@ -41,17 +41,13 @@ $labCreateJobs = $config | ForEach-Object {
                            }
 Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
 
-$configBastion = [Array] ($config | Where-Object { $_.BastionEnabled -eq $true })
+$configBastion = [Array] ($config | Where-Object { $_.BastionEnabled })
 if (($configBastion | Measure-Object).Count -gt 0) {
     # Deploy the Azure Bastion hosts to the labs
     Write-Host "---------------------------------" -ForegroundColor Green
     Write-Host "Deploying $($configBastion.Count) Bastion hosts to the labs..." -ForegroundColor Green
-    # $bastionDeployJobs = $config | ForEach-Object { # TODO parallel
-    $configBastion | ForEach-Object {
-        New-BastionHost -ResourceGroupName $_.ResourceGroupName -DevTestLabName $_.DevTestLabName
-        # Start-Sleep -Seconds $SecondsBetweenLoop
-    # Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
-    }
+    # Currently use Leave strategy for existing Bastions
+    "./Deploy-Bastion.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -SecTimeout (8 * 60 * 60) -CustomRole $null -ModulesToImport $AzDtlModulePath
 }
 
 # Update the shutdown policy on the labs
