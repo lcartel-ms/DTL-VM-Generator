@@ -446,18 +446,86 @@ function Invoke-RSForEachLab {
 }
 
 function Get-RandomString {
-    param(
+  param(
     [Parameter(Mandatory)]
     #Joining together a..z and A..Z we have exactly 52 characters to choose from
     [ValidateRange(0, 52)]
     [byte]$length
-    )
-    #Set ASCII boundaries for letter generation
-    $lowercaseA = 65
-    $lowercaseZ = 90
-    $uppercaseA = 97
-    $uppercaseZ = 122
-    return -join (($lowercaseA..$lowercaseZ) + ($uppercaseA..$uppercaseZ) `
-      | Get-Random -Count $length `
-      | ForEach-Object {[char]$_})
+  )
+  #Set ASCII boundaries for letter generation
+  $lowercaseA = 65
+  $lowercaseZ = 90
+  $uppercaseA = 97
+  $uppercaseZ = 122
+  return -join (($lowercaseA..$lowercaseZ) + ($uppercaseA..$uppercaseZ) `
+    | Get-Random -Count $length `
+    | ForEach-Object { [char]$_ })
+}
+
+function Split-Tags {
+  param
+  (
+    [Parameter(Mandatory)]
+    [psobject]$tags
+  )
+  $TAG_VALUE_MAX_LENGTH = 256
+  $MAX_TAG_PARTS_ALLOWED = 10
+  $tagFormatter = '"{0}":"{1}",'
+
+  $formattedTags = $tags | ForEach-Object {
+    # Azure max tag value length is 256. To circumvent this, a longer tag is splitted up
+    $tagValue = $_.Value.ToString()
+    $partsCounts = [int][Math]::Ceiling($tagValue.Length / $TAG_VALUE_MAX_LENGTH)
+    # Tag List to upload to the Image Version
+    $tagList = ""
+
+    #Extreme case : a tag longer than 2560 characters isn't allowed. 
+    # This can be easily extended by adding a new digit to the part numbering
+    # But that's just plain overkill at this point
+    if ($partsCounts -gt $MAX_TAG_PARTS_ALLOWED){
+      $maxCharactersAllowed = $MAX_TAG_PARTS_ALLOWED * $TAG_VALUE_MAX_LENGTH
+      throw "The tag $tagValue is longer than the max allowed tag length $maxCharactersAllowed character"
+    }
+    # Tag shorter than the limit, just add it to the list 
+    if ($partsCounts -le 1) {
+      $tagList = $tagFormatter -f $_.Name, $tagValue
+    }else{
+      #Tag longer than the limit, splitting it up into parts "key_$i : $PartialValue"
+      for ($i = 0; $i -lt $partsCounts; $i++) {
+        $partialKeyName = $_.Name + "_$i"
+        $cutIndex = $i * $TAG_VALUE_MAX_LENGTH
+        # Number of characters to cut
+        $chunkSize = [Math]::Min($TAG_VALUE_MAX_LENGTH, $tagValue.Length - $cutIndex)
+        $tagList += $tagFormatter -f $partialKeyName, $tagValue.Substring($cutIndex, $chunkSize) + "`n"
+      }
+    }
+    #Remove trailing newlines or spaces if any
+    $tagList.Trim()
+  } | Out-String
+  #Remove trailing comma
+  $formattedTags.Trim() -replace ".$"
+}
+
+function Join-Tags{
+  param
+  (
+    [Parameter(Mandatory)]
+    $tags
+  )
+  # Iterate on sorted "_X" properties parts, removing them while reassembling the property value
+  # The properties that weren't previously splitted are left untouched.
+  # Properties such as "YYY_0" and "YYY_1" will be reassembled as just "YYY", concatenating their values.
+  $numeralMatcher = "_\d+$"
+  $tags.PSobject.Properties.name -match $numeralMatcher | Sort-Object | ForEach-Object {
+    $propertyName = $_ -replace $numeralMatcher
+    # Create the property "YYY"
+    if (-not ($tags | Get-Member -Name "$propertyName")) {
+      $tags | Add-Member -MemberType "NoteProperty" -Name "$propertyName" -Value ""
+    }
+    # Concatenate the value of "YYY_X" to "YYY"
+    $tags.$propertyName += $tags.$_
+    # Remove the old "YYY_X" property
+    $tags.PSObject.Properties.Remove($_)
+  }
+  $tags
 }

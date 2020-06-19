@@ -71,9 +71,12 @@ $importVhdToSharedImageGalleryScriptBlock = {
 
         [ValidateNotNullOrEmpty()]
         [Parameter(Mandatory=$true, HelpMessage="The resource ID of the storage account where VHDs are stored")]
-        [string] $StorageAccountResourceId
-    )
+        [string] $StorageAccountResourceId,
 
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory=$true, HelpMessage="The tags describing the image version")]
+        [psobject] $tagDetails
+    )
     # Workaround for https://github.com/Azure/azure-powershell/issues/9448
     $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
     $Mutex.WaitOne() | Out-Null
@@ -127,13 +130,6 @@ $importVhdToSharedImageGalleryScriptBlock = {
     }
 
     Write-Output "   Creating a new image version for '$($imageInfo.imageName)'"
-
-    # Convert the properties to a hashtable so we can apply as tags
-    $tagDetails = $imageInfo.psobject.properties | ForEach-Object { '"' + $_.Name + '" : "' + $_.Value.ToString() + '",' } | Out-String
-    while ($tagDetails.Length -gt 0 -and $tagDetails.Trim().EndsWith(",")) {
-        # If we have tags, we need to remove the last comma
-        $tagDetails = $tagDetails -replace ".$"
-    }
 
     # Let's create a new image version based on the existing image definition & upload the VHD
     # NOTE: we have no powershell support for this, so we have to do it by deploying a template
@@ -231,7 +227,8 @@ $jobs = @()
 # For each JSON file, we create a image (if there isn't one already), or add a new image version
 foreach ($imageInfo in $VmSettings) {
     Write-Output "Starting job to import $($imageInfo.imageName) image"
-    $jobs += Start-RSJob -ScriptBlock $importVhdToSharedImageGalleryScriptBlock -ArgumentList $SharedImageGallery, $ImageDefinitions, $imageInfo, $StorageAccountResourceId -Throttle 25
+    $tagDetails = Split-Tags $imageInfo.psobject.properties
+    $jobs += Start-RSJob -ScriptBlock $importVhdToSharedImageGalleryScriptBlock -ArgumentList $SharedImageGallery, $ImageDefinitions, $imageInfo, $StorageAccountResourceId, $tagDetails -Throttle 25
     Start-Sleep -Seconds 15
 }
 

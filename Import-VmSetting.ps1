@@ -99,7 +99,8 @@ else {
     $sourceImageInfos = @()
 
     $images | ForEach-Object {
-        $sourceImageInfos += New-Object PSCustomObject -Property $_.Tags
+        $tags =  New-Object PSCustomObject -Property $_.Tags
+        $sourceImageInfos += Join-Tags $tags
     }
 
     $sourceImageInfos
