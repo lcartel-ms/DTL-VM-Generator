@@ -20,6 +20,9 @@ logs/*
 #Exclude Tests
 Test-*
 
+#Exclude generalized VMs credentials
+credentials.csv
+
 #Exclude DTL module
 # Az.DevTestLabs2.psm1
 Az.DevTestLabs2.psm1

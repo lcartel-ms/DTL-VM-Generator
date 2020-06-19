@@ -55,27 +55,28 @@ foreach($descr in $VmSettings) {
 
   $pipelineArgs = $lab.PsObject.Copy()
   # Check if it's a generalized VM
-  if ($descr.PSobject.Properties.name -match "OsState" -and  $descr.osState -eq "Generalized") {
+  if ($descr.osState -eq "Generalized") {
     # Retrieve or generate an username
     $username = if ($descr.PSobject.Properties.name -match "username") { $descr.username } else { Get-RandomString 10 }
     $pipelineArgs | Add-Member -MemberType "NoteProperty" -Name "userName" -Value "$username" -Force
-
+    
     # Retrieve or generate a password
-    $passOrKey = if ($descr.PSobject.Properties.name -match "passwordOrKey") { $descr.passwordOrKey } else { Get-RandomString 25 }
-    # If the VM is linux-based, check if the password is a public key
-    # Note : Get-RandomString can't generate '-' nor ' ', generated passwords won't cause weird error cases
-    if ($descr.osType -eq "Linux" -and $passOrKey.startsWith("ssh-rsa ") ) {
-      $pipelineArgs | Add-Member -MemberType "NoteProperty" -Name "SshKey" -Value "$passOrKey"
-      Write-Host "$vmName username is $username and is using an SSH key"
+    if ($descr.credentialType -eq "Password"){
+      $password = if ($descr.PSobject.Properties.name -match "credentialValue") { $descr.credentialValue } else { Get-RandomString 25 }
+      $pipelineArgs | Add-Member -MemberType "NoteProperty" -Name "Password" -Value "$password"
+      $descr.credentialValue = $password 
     }
-    # For any other case : Windows or a Linux VM using a password, set the password. 
+    # Using an SSH key
     else{
-      $pipelineArgs | Add-Member -MemberType "NoteProperty" -Name "Password" -Value "$passOrKey"
-      Write-Host "$vmName username and password are $username and $passOrKey"
+      $pipelineArgs | Add-Member -MemberType "NoteProperty" -Name "SshKey" -Value "$($descr.credentialValue)"
     }
-
+    # Create or Update the CSV file
+    if (Test-Path .\credentials.csv) { 
+      (Import-Csv -Path .\credentials.csv) | Where-Object { $_.VMName -ne "$vmName" } | Export-Csv -NoTypeInformation -Path .\credentials.csv
+    }
+    $item = New-Object PSCustomObject -Property @{"VMName" = $vmName; "Username" = $username; "CredentialValue" = $descr.credentialValue }
+    Export-Csv -NoTypeInformation -InputObject $item -Path .\credentials.csv
   }
-
 
   $jobs += $pipelineArgs | New-AzDtlVm -VmName $vmName `
                               -Size $descr.size `
