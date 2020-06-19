@@ -98,7 +98,7 @@ function MyGetResourceVm {
       if($Name -and (-not $Name.Contains("*"))) { # Proper RG, Proper LabName, Proper Name
         if($azureRm) {
           Get-AzureRmResource -ExpandProperties -resourcetype $ResourceType -ResourceGroupName $ResourceGroupName -Name "$LabName/$Name" -EA SilentlyContinue
-        } else { 
+        } else {
           Get-AzureRmResource -ExpandProperties -resourcetype $ResourceType -ResourceGroupName $ResourceGroupName -EA SilentlyContinue | Where-Object { $_.ResourceId -like "*/labs/$LabName/virtualmachines/$Name"}
         }
       } else { # Proper RG, Proper LabName, Improper Name
@@ -244,7 +244,7 @@ function DeployLab {
       $rg = Get-AzResourceGroup | Out-Null
       $Mutex.ReleaseMutex() | Out-Null
     }
-    
+
     $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -TemplateParameterObject $Parameters
     Write-debug "Deployment succeded with deployment of `n$deployment"
 
@@ -654,7 +654,7 @@ function Add-AzDtlLabTags {
                 }
                 return
             }
-                    
+
             function Unify-Tags {
                 [CmdletBinding()]
                 param(
@@ -708,9 +708,9 @@ function Add-AzDtlLabTags {
                     [Hashtable]$Left,
 
                     [Parameter(Mandatory = $true)]
-                    [Hashtable]$Right		
+                    [Hashtable]$Right
 	            )
-	
+
 	            function New-Result($Key, $LValue, $Side, $RValue) {
 		            New-Object -Type PSObject -Property @{
 					            key    = $Key
@@ -732,9 +732,9 @@ function Add-AzDtlLabTags {
 	            $Results += $Right.Keys | % {
 		            if (!$Left.ContainsKey($_) -and $Right.ContainsKey($_)) {
 			            New-Result $_ $Null "=>" $Right[$_]
-		            } 
+		            }
 	            }
-	            $Results 
+	            $Results
             }
 
             # If we have only the resource Id, let's get the full object
@@ -806,11 +806,11 @@ function Add-AzDtlLabTags {
                   }
               }
         }
-    } 
+    }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
-  } 
+  }
   end {
   }
 }
@@ -893,11 +893,11 @@ function Set-AzDtlLabIpPolicy {
 
       # Return the lab to continue in the pipeline
       return $Lab
-    } 
+    }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
-  } 
+  }
   end {
   }
 
@@ -927,18 +927,18 @@ function Get-AzDtlLabSharedImageGallery {
           if ($IncludeImages) {
               # Get the images in the shared image gallery
               $sigImages = $sig | Get-AzDtlLabSharedImageGalleryImages
-              
+
               # Add the images to the shared image gallery object
               $sig | Add-Member -MemberType NoteProperty -Name "Images" -Value $sigimages
           }
-            
+
         return $sig
       }
-    } 
+    }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
-  } 
+  }
   end {
   }
 }
@@ -955,11 +955,11 @@ function Remove-AzDtlLabSharedImageGallery {
   process {
     try{
         Remove-AzureRmResource -ResourceId $SharedImageGallery.ResourceId -ApiVersion 2018-10-15-preview -Force
-    } 
+    }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
-  } 
+  }
   end {
   }
 }
@@ -1010,11 +1010,11 @@ function Set-AzDtlLabSharedImageGallery {
         # following the pipeline pattern, return the shared image gallery object on the pipeline
         return ($Lab | Get-AzDtlLabSharedImageGallery)
 
-    } 
+    }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
-  } 
+  }
   end {
   }
 }
@@ -1041,12 +1041,12 @@ function Get-AzDtlLabSharedImageGalleryImages {
                                          }
 
         return $sigimages
-     
-    } 
+
+    }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
-  } 
+  }
   end {
   }
 }
@@ -1106,7 +1106,7 @@ function Set-AzDtlLabSharedImageGalleryImages  {
             $result = Set-AzureRmResource -ResourceId $SharedImageGallery.ResourceId `
                                           -Properties $propertiesObject `
                                           -ApiVersion 2018-10-15-preview `
-                                          -Force            
+                                          -Force
         }
 
         if ($ImageName) {
@@ -1119,7 +1119,7 @@ function Set-AzDtlLabSharedImageGalleryImages  {
             }
 
             UpdateSharedImageGalleryImage $SharedImageGallery.ResourceId $ImageName $OsType $ImageType $status
-           
+
         } else {
             # First ensure the Images property is correctly set
             if ($SharedImageGallery.Images) {
@@ -1127,7 +1127,7 @@ function Set-AzDtlLabSharedImageGalleryImages  {
                 foreach ($img in $SharedImageGallery.Images) {
                     UpdateSharedImageGalleryImage $SharedImageGallery.ResourceId $img.definitionName $img.osType $img.imageType $img.enableState
                 }
-                
+
             } else {
                 Write-Error '$SharedImageGallery.Images property must be set or ImageName & Enabled must be set'
             }
@@ -1136,11 +1136,11 @@ function Set-AzDtlLabSharedImageGalleryImages  {
         # following the pipeline pattern, return the shared image gallery object on the pipeline
         return $SharedImageGallery
 
-    } 
+    }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
-  } 
+  }
   end {
   }
 }
@@ -1352,7 +1352,7 @@ function Stop-AzDtlVm {
             Enable-AzContextAutosave -Scope Process | Out-Null
             $rg = Get-AzResourceGroup | Out-Null
             $Mutex.ReleaseMutex() | Out-Null
-     
+
           }
 
           Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "stop" -Force | Out-Null
@@ -1638,7 +1638,7 @@ function Convert-AzDtlVirtualNetwork {
 
       # Trying to pass through the LabUId tag is a dead end.
       # No way to get the name of the Lab from the UId..
-    
+
       # $DtlLabUId = $VirtualNetwork.Tags.GetEnumerator() | `
       # Where-Object { $_.Key -eq "hidden-DevTestLabs-LabUId" } | `
       # Select-Object -ExpandProperty Value -First 1
@@ -1649,7 +1649,7 @@ function Convert-AzDtlVirtualNetwork {
 
       $dtlVirtualNetworkId = $VirtualNetworkId.Replace("Microsoft.Network", "microsoft.devtestlab/labs/$($Lab.Name)")
       Get-AzureRmResource -ResourceId $dtlVirtualNetworkId
-      
+
     } catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
@@ -1666,7 +1666,6 @@ function Get-AzDtlLabVirtualNetworks {
     $Lab,
 
     [parameter(Mandatory=$false, HelpMessage="Id of type Microsoft.DevTestLab/labs/virtualnetworks of a Lab Virtual Network. If none, get all the attached Virtual Networks.")]
-    [ValidateNotNullOrEmpty()]
     [string] $LabVirtualNetworkId = "",
 
     [parameter(Mandatory=$false, HelpMessage="If set, get the underlying Microsoft.Network resource")]
@@ -1684,12 +1683,12 @@ function Get-AzDtlLabVirtualNetworks {
           if ($LabVirtualNetworkId.Split("/")[6] -ine "microsoft.devtestlab") {
             throw "VirtualNetworkId is not of type Microsoft.DevTestLab/labs/virtualnetworks"
           }
-          
+
           if ($ExpandedNetwork) {
 
             $virtualNetworkId = $LabVirtualNetworkId -ireplace "microsoft.devtestlab/labs/$($Lab.Name)", "Microsoft.Network"
             Get-AzureRmVirtualNetwork -ResourceGroupName $virtualNetworkId.Split("/")[4] -Name $virtualNetworkId.Split("/")[8]
-          
+
           } else {
             Get-AzureRmResource -ResourceId $LabVirtualNetworkId
           }
@@ -1706,7 +1705,7 @@ function Get-AzDtlLabVirtualNetworks {
           if ($ExpandedNetwork) {
             $labVirtualNetworks | ForEach-Object {
               Get-AzureRmVirtualNetwork -ResourceGroupName $_.ResourceGroupName -Name $_.Name
-            }  
+            }
           }
           else {
             $labVirtualNetworks
@@ -1766,6 +1765,50 @@ function Get-AzDtlLabVirtualNetworkSubnets {
   end {}
 }
 
+function Set-AzDtlLabBrowserConnect {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true,HelpMessage="Lab to remove the Bastion host from.", ValueFromPipeline=$true)]
+    [ValidateNotNullOrEmpty()]
+    $Lab,
+
+    [parameter(Mandatory=$false, ValueFromPipeline=$false, HelpMessage="Filter by type of DTL Subnet")]
+    [ValidateSet('Enabled','Disabled')]
+    [string] $BrowserConnect = 'Enabled'
+  )
+
+  begin {. BeginPreamble}
+  process {
+    try {
+
+      $Lab = $Lab | Get-AzDtlLab
+
+      if ($Lab.Properties.browserConnect -ne $BrowserConnect) {
+
+        Write-Host "Updating Lab Browser Connect to '$BrowserConnect'"
+
+        # Must use the Preview API
+        $Lab.Properties.browserConnect = $BrowserConnect
+        Set-AzureRmResource `
+          -ResourceId $Lab.ResourceId `
+          -ApiVersion 2018-10-15-preview `
+          -Properties $Lab.Properties `
+          -Force | Out-Null
+
+        Write-Host "Lab Browser Connect successfully updated to '$BrowserConnect'"
+        
+        $Lab | Get-AzDtlLab
+      } else {
+        Write-Warning "Lab Browser Connect is already set to '$BrowserConnect'"
+      }
+    }
+    catch {
+      Write-Error -ErrorRecord $_ -EA $callerEA
+    }
+  }
+  end {}
+}
+
 # LabVirtualNetwork =  DTL VNet type
 # VirtualNetwork = Std VNet type
 # Deploy an Azure Bastion host to Lab Virtual Network
@@ -1777,7 +1820,6 @@ function New-AzDtlBastion {
     $Lab,
 
     [parameter(Mandatory=$false,HelpMessage="Id of type Microsoft.DevTestLab/labs/virtualnetworks of the Lab Virtual Network used in VM creation. Defaults to the VNet with VMs creation enabled, if there is only one. If you are using an existing virtual network, make sure the existing virtual network has enough free address space to accommodate the Bastion subnet requirements.")]
-    [ValidateNotNullOrEmpty()]
     [string] $LabVirtualNetworkId = "",
 
     [parameter(Mandatory=$true,HelpMessage="IP address prefix (CIDR notation) where to deploy the Bastion host")]
@@ -1789,7 +1831,7 @@ function New-AzDtlBastion {
   process {
     try {
 
-      if ($LabVirtualNetworkId.Split("/")[6] -ine "microsoft.devtestlab") {
+      if ($LabVirtualNetworkId -and $LabVirtualNetworkId.Split("/")[6] -ine "microsoft.devtestlab") {
         throw "VirtualNetworkId is not of type Microsoft.DevTestLab/labs/virtualnetworks"
       }
 
@@ -1814,6 +1856,7 @@ function New-AzDtlBastion {
       # without furtherly creating their own Bastion subnet.
       Write-Host "Retrieving the attached Virtual Network where to deploy the Azure Bastion"
       $LabVirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetworkId
+      $LabVirtualNetworkId = $LabVirtualNetwork.ResourceId
 
       # In the Lab VNets, look for an underlying subnet supporting VMs creation.
       # If 0 or > 1 VNet is found, we don't deploy the Bastion (today)
@@ -1832,7 +1875,7 @@ function New-AzDtlBastion {
       Write-Host "Retrieving the underlying attached Virtual Network used to deploy the Azure Bastion"
       $VirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetwork.ResourceId -ExpandedNetwork
 
-      #TODO Skip this step if there is already a subnet named 'AzureBastionSubnet'
+      # TODO Skip this step if there is already a subnet named 'AzureBastionSubnet'
       # Try to create a new subnet named 'AzureBastionSubnet' in this address range
       Write-Host "Adding a subnet 'AzureBastionSubnet' at $BastionSubnetAddressPrefix"
       $VirtualNetwork = Add-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $VirtualNetwork -Name "AzureBastionSubnet" -AddressPrefix $BastionSubnetAddressPrefix
@@ -1844,7 +1887,7 @@ function New-AzDtlBastion {
       $bastionPublicIpAddress =
               New-AzureRmPublicIpAddress `
                   -ResourceGroupName $Lab.ResourceGroupName `
-                  -Name "$($Lab.Name)PublicIP" `
+                  -Name "$($Lab.Name)BastionPublicIP" `
                   -Location $Lab.Location `
                   -AllocationMethod "Static" `
                   -Sku "Standard"
@@ -1862,29 +1905,127 @@ function New-AzDtlBastion {
 
       Write-Host "Azure Bastion resource successfully created"
 
-      # Make sure BrowserConnect property for the Lab is set to enabled
-      # Must use the Preview API
-      
-      if ($Lab.Properties.browserConnect -ne "Enabled") {
+      $Lab = $Lab | Set-AzDtlLabBrowserConnect -BrowserConnect 'Enabled'
 
-        Write-Host "Enabling Browser Connection for VMs in the Lab"
-
-        $Lab.Properties.browserConnect = "Enabled"
-        Set-AzureRmResource `
-          -ResourceId $Lab.ResourceId `
-          -ApiVersion 2018-10-15-preview `
-          -Properties $Lab.Properties `
-          -Force | Out-Null
-
-        Write-Host "Browser Connection successfully enabled"
-      }
-
-      # Return the updated lab
-      Write-Host "Returning the Lab"
-      $Lab | Get-AzDtlLab
+      # Return the newly created Bastion
+      Write-Host "Returning the Bastion"
+      $Lab | Get-AzDtlBastion -LabVirtualNetworkId $LabVirtualNetworkId
     }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
+    }
+  }
+  end {}
+}
+
+function Get-AzDtlBastion {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true,HelpMessage="Lab to get the Bastion host from.", ValueFromPipeline=$true)]
+    [ValidateNotNullOrEmpty()]
+    $Lab,
+
+    [parameter(Mandatory=$false,HelpMessage="Id of type Microsoft.DevTestLab/labs/virtualnetworks of the Lab Virtual Network used for Bastion. Deafults to the 1 and only VNet that has an Azure Bastion Subnet.")]
+    [string] $LabVirtualNetworkId = ""
+  )
+  begin {. BeginPreamble}
+  process {
+    try {
+
+      if ($LabVirtualNetworkId -and $LabVirtualNetworkId.Split("/")[6] -ine "microsoft.devtestlab") {
+        throw "VirtualNetworkId is not of type Microsoft.DevTestLab/labs/virtualnetworks"
+      }
+
+      # Get again the lab just in case the preview API was not used
+      $Lab = $Lab | Get-AzDtlLab
+
+      Write-Host "Retrieving the attached Virtual Network where Azure Bastion is deployed"
+      # Cannot retrieve AzureBastionSubnet from DTLVNet subnetOverrides property
+      $VirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetworkId -ExpandedNetwork
+
+      # In the Lab VNets, look for an underlying subnet named AzureBastionSubnet.
+      # If 0 or > 1 VNet is found, we don't remove the Bastion
+      $VirtualNetwork = $VirtualNetwork | Where-Object {
+        $bastionSubnet = [Array] $_.Subnets | Where-Object { $_.Name -eq "AzureBastionSubnet" } | Select-Object -First 1
+        if ($bastionSubnet) {
+          return $_
+        }
+      }
+
+      $ipConfigBastions = [Array] $bastionSubnet.IpConfigurations | Where-Object {
+        ("$($_.Id.Split("/")[6])/$($_.Id.Split("/")[7])" -eq "Microsoft.Network/bastionHosts")
+      }
+
+      if (($ipConfigBastions | Measure-Object).Count -eq 0) {
+        throw "No bastion associated to this IPConfig"
+      }
+      if (($ipConfigBastions | Measure-Object).Count -gt 1) {
+        throw "More than 1 bastion associated to this IPConfig"
+      }
+
+      $bastionResourceGroupName = $ipConfigBastions.Id.Split("/")[4]
+      $bastionName = $ipConfigBastions.Id.Split("/")[8]
+      
+      Get-AzBastion `
+            -ResourceGroupName $bastionResourceGroupName `
+            -Name $bastionName
+    }
+    catch {
+      Write-Error -ErrorRecord $_ -EA $callerEA
+    }
+  }
+  end {}
+}
+
+function Remove-AzDtlBastion {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true,HelpMessage="Lab to remove the Bastion host from.", ValueFromPipeline=$true)]
+    [ValidateNotNullOrEmpty()]
+    $Lab,
+
+    [parameter(Mandatory=$false,HelpMessage="Id of type Microsoft.DevTestLab/labs/virtualnetworks of the Lab Virtual Network used for Bastion. Deafults to the 1 and only VNet that has an Azure Bastion Subnet.")]
+    [string] $LabVirtualNetworkId = ""
+  )
+
+  begin {. BeginPreamble}
+  process {
+    try {
+
+      if ($LabVirtualNetworkId -and $LabVirtualNetworkId.Split("/")[6] -ine "microsoft.devtestlab") {
+        throw "VirtualNetworkId is not of type Microsoft.DevTestLab/labs/virtualnetworks"
+      }
+
+      $Lab = $Lab | Get-AzDtlLab
+      $bastion = $Lab | Get-AzDtlBastion -LabVirtualNetworkId $LabVirtualNetworkId
+
+      Write-Host "Removing the bastion '$($bastion.Name)'."
+      $bastion | Remove-AzBastion -Force
+
+      $VirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetworkId -ExpandedNetwork
+
+      $bastion.IpConfigurations | ForEach-Object {
+
+        if ($_.PublicIpAddress) {
+          Write-Host "Removing the Public Ip Address assigned to the Azure Bastion 'AzureBastionSubnet'."
+          Remove-AzureRmResource -ResourceId $_.PublicIpAddress.Id -Force
+        }
+
+        if ($_.Subnet) {
+          Write-Host "Removing the subnet 'AzureBastionSubnet'."
+          $bastionSubnet = Get-AzureRmResource -ResourceId $_.Subnet.Id
+          Remove-AzureRmVirtualNetworkSubnetConfig -Name $bastionSubnet.Name -VirtualNetwork $VirtualNetwork
+          $VirtualNetwork | Set-AzureRmVirtualNetwork
+        }
+      }
+
+      $Lab | Set-AzDtlLabBrowserConnect -BrowserConnect 'Disabled' | Out-Null
+      
+      return $true
+    }
+    catch {
+      Write-Error -ErrorRecord $_ -EA $callerEA
+      return $false
     }
   }
   end {}
@@ -1951,11 +2092,11 @@ function Set-AzDtlMandatoryArtifacts {
 
         Set-AzureRmResource -Name $labObj.Name -ResourceGroupName $labObj.ResourceGroupName -ResourceType "Microsoft.DevTestLab/labs" -Properties $labObj.Properties -ApiVersion 2018-10-15-preview -Force
 
-    } 
+    }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
-  } 
+  }
   end {
   }
 }
@@ -2028,7 +2169,7 @@ function Set-AzDtlVmArtifact {
                 Enable-AzContextAutosave -Scope Process | Out-Null
                 $rg = Get-AzResourceGroup | Out-Null
                 $Mutex.ReleaseMutex() | Out-Null
-          
+
             }
 
             $ResourceGroupName = $v.ResourceGroupName
@@ -2330,7 +2471,7 @@ function New-AzDtlVm {
         $p | Add-Member -Name 'size' -Value $Size -MemberType NoteProperty
 
         if($StorageType) {$p | Add-Member -Name 'storageType' -Value $StorageType -MemberType NoteProperty}
-        
+
         if($Notes) {$p | Add-Member -Name 'notes' -Value $Notes -MemberType NoteProperty}
 
         if($Claimable) {$p | Add-Member -Name 'allowClaim' -Value $True -MemberType NoteProperty}
@@ -2424,7 +2565,7 @@ function New-AzDtlVm {
                     $SigImageName = $SigImageString.Split("/") | Select -Last 1
                     $SigGalleryName = $SigImageString.Split("/") | Select -Last 2 | Select -First 1
                 }
-               
+
             }
 
             $SubscriptionID = (Get-AzureRmContext).Subscription.Id
@@ -2611,7 +2752,7 @@ function New-AzDtlLabEnvironment{
         $UserId = $((Get-AzureRmADUser -UserPrincipalName (Get-AzureRmContext).Account).Id.Guid)
         if (-not $UserId) {throw "Unable to get User Id."}
       }
-           
+
       # Get the DevTest lab internal repository identifier
       $repository = Get-AzureRmResource -ResourceGroupName $Lab.ResourceGroupName `
         -ResourceType 'Microsoft.DevTestLab/labs/artifactsources' `
@@ -2619,7 +2760,7 @@ function New-AzDtlLabEnvironment{
         -ApiVersion 2016-05-15 `
         | Where-Object { $ArtifactRepositoryDisplayName -in ($_.Name, $_.Properties.displayName) } `
         | Select-Object -First 1
-      
+
       if (-not $repository) { throw "Unable to find repository $ArtifactRepositoryDisplayName in lab $($Lab.Name)." }
 
       # Get the internal environment template name
@@ -2629,11 +2770,11 @@ function New-AzDtlLabEnvironment{
         -ApiVersion 2016-05-15 `
         | Where-Object { $TemplateName -in ($_.Name, $_.Properties.displayName) } `
         | Select-Object -First 1
-      
-      if (-not $template) { throw "Unable to find template $TemplateName in lab $($Lab.Name)." } 
 
-      $templateProperties = @{ "deploymentProperties" = @{ "armTemplateId" = "$($template.ResourceId)"; "parameters" = $EnvironmentParameterSet }; } 
-    
+      if (-not $template) { throw "Unable to find template $TemplateName in lab $($Lab.Name)." }
+
+      $templateProperties = @{ "deploymentProperties" = @{ "armTemplateId" = "$($template.ResourceId)"; "parameters" = $EnvironmentParameterSet }; }
+
       # Create the environment
       $deployment = New-AzureRmResource -Location $Lab.Location `
         -ResourceGroupName $Lab.ResourceGroupName `
@@ -2649,7 +2790,7 @@ function New-AzDtlLabEnvironment{
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
-  } 
+  }
   end {
   }
  }
@@ -2659,7 +2800,7 @@ function Get-AzDtlLabEnvironment{
   param(
     [parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Lab object to get environments from.")]
     [ValidateNotNullOrEmpty()]
-    $Lab    
+    $Lab
   )
 
   begin {. BeginPreamble}
@@ -2669,23 +2810,23 @@ function Get-AzDtlLabEnvironment{
      #Get LabId
      $labId = Get-AzDtlLab -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName
 
-     if (-not $labId) { throw "Unable to find lab $($Lab.Name) with resource group $($Lab.ResourceGroupName)." } 
+     if (-not $labId) { throw "Unable to find lab $($Lab.Name) with resource group $($Lab.ResourceGroupName)." }
 
      #Get all environments
      $environs = Get-AzureRmResource -ResourceGroupName $Lab.ResourceGroupName `
        -ResourceType 'Microsoft.DevTestLab/labs/users/environments' `
        -ResourceName "$($Lab.Name)/@all" `
-       -ApiVersion '2016-05-15' 
+       -ApiVersion '2016-05-15'
 
      $labId | Add-Member -NotePropertyName 'environments' -NotePropertyValue $environs
-     
+
      return $labId
-     
-    } 
+
+    }
     catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
-  } 
+  }
   end {
   }
 }
@@ -3386,7 +3527,7 @@ function BuildVmSizeThresholdString {
     # Process the incoming allowed sizes, need to convert to the special string
     $thresholdString = ($vmSizes | ForEach-Object {
         $finalSize = $_
-        
+
         # Add starting & ending string if missing
         if (-not $_.StartsWith('"')) {
             $finalSize = '"' + $finalSize
@@ -3516,7 +3657,7 @@ function Get-AzDtlLabAllowedVmSizePolicy {
             } else {
                 $sizes = $null
             }
-            
+
             [pscustomobject] @{
                 Status = $policy.Properties.Status
                 AllowedSizes = $sizes
@@ -3917,12 +4058,14 @@ New-Alias -Name 'UnClaim-AzureRmDtlVm'    -Value Invoke-AzDtlVmUnClaim
 New-Alias -Name 'Dtl-NewEnvironment'      -Value New-AzDtlLabEnvironment
 New-Alias -Name 'Dtl-GetEnvironment'      -Value Get-AzDtlLabEnvironment
 
-New-Alias -Name 'Dtl-ConvertVirtualNetwork'  -Value Convert-AzDtlVirtualNetwork
-New-Alias -Name 'Dtl-GetVirtualNetworks'  -Value Get-AzDtlLabVirtualNetworks
+New-Alias -Name 'Dtl-ConvertVirtualNetwork'     -Value Convert-AzDtlVirtualNetwork
+New-Alias -Name 'Dtl-GetVirtualNetworks'        -Value Get-AzDtlLabVirtualNetworks
 New-Alias -Name 'Dtl-GetVirtualNetworkSubnets'  -Value Get-AzDtlLabVirtualNetworkSubnets
 
-New-Alias -Name 'Dtl-NewBastion'          -Value New-AzDtlBastion
-
+New-Alias -Name 'Dtl-SetLabBrowserConnect'  -Value Set-AzDtlLabBrowserConnect
+New-Alias -Name 'Dtl-NewBastion'            -Value New-AzDtlBastion
+New-Alias -Name 'Dtl-GetBastion'            -Value Get-AzDtlBastion
+New-Alias -Name 'Dtl-RemoveBastion'         -Value Remove-AzDtlBastion
 
 Export-ModuleMember -Function New-AzDtlLab,
                               Remove-AzDtlLab,
@@ -3969,7 +4112,10 @@ Export-ModuleMember -Function New-AzDtlLab,
                               Convert-AzDtlVirtualNetwork,
                               Get-AzDtlLabVirtualNetworks,
                               Get-AzDtlLabVirtualNetworkSubnets,
-                              New-AzDtlBastion
+                              Set-AzDtlLabBrowserConnect,
+                              New-AzDtlBastion,
+                              Get-AzDtlBastion,
+                              Remove-AzDtlBastion
 
 Export-ModuleMember -Alias *
 #endregion
