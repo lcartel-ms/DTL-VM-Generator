@@ -8,19 +8,12 @@ param
     [Parameter(Mandatory=$true, HelpMessage="The Name of the resource group")]
     [string] $ResourceGroupName,
 
-    [parameter(Mandatory=$true, HelpMessage="Public=separate IP Address, Shared=load balancers optimizes IP Addresses, Private=No public IP address.")]
-    [string] $LabIpConfig,
-
-    [parameter(Mandatory=$true, HelpMessage="Whether the Lab requires an Azure Bastion host for in-browser RDP connection")]
-    [bool] $LabBastionEnabled,
+    [parameter(Mandatory=$false, HelpMessage="Public=separate IP Address, Shared=load balancers optimizes IP Addresses, Private=No public IP address.")]
+    [string] $LabIpConfig = "Public",
 
     [ValidateSet("Delete","Leave","Error")]
-    [Parameter(Mandatory=$true, HelpMessage="What to do if a VM with the same name exist in the lab (Delete, Leave, Error)")]
-    [string] $IfExist,
-
-    [Parameter(valueFromRemainingArguments=$true)]
-    [String[]]
-    $rest = @()
+    [Parameter(Mandatory=$false, HelpMessage="What to do if a VM with the same name exist in the lab (Delete, Leave, Error)")]
+    [string] $IfExist = "Leave"
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,6 +33,8 @@ $lab = Get-AzDtlLab -ResourceGroupName $ResourceGroupName -Name $DevTestLabName
 # Get the underlying VNets
 Write-Host "Retrieving details of the Lab VNet"
 $virtualNetworks = $lab | Get-AzDtlLabVirtualNetworks -ExpandedNetwork
+
+# TODO Check if there is already a Subnet named AzureBastionSubnet. If so, fail depending on the strategy $IfExist
 
 # Try to get an address range with lenght >= 27 (smallest supported by Bastion)
 Write-Host "Trying to get an unallocated address range of size >= /27"
