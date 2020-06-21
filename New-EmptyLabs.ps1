@@ -36,7 +36,7 @@ $configCount = ($config | Measure-Object).Count
 Write-Host "---------------------------------" -ForegroundColor Green
 Write-Host "Creating $configCount labs..." -ForegroundColor Green
 $labCreateJobs = $config | ForEach-Object {
-                                $_ | New-AzDtlLab -AsJob
+                                $_ | New-AzDtlLab -VmCreationSubnetPrefix "10.0.0.0/21" -AsJob
                                 Start-Sleep -Seconds $SecondsBetweenLoop
                            }
 Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
