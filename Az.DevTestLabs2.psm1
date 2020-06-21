@@ -2012,6 +2012,10 @@ function Get-AzDtlBastion {
         }
       }
 
+      if (-not $VirtualNetwork) {
+        return $null
+      }
+
       # Trace back the Bastion host from the assigned IPConfig
       # Look for an IP Configuration of type Microsoft.Network/bastionHosts
       $ipConfigBastions = [Array] $bastionSubnet.IpConfigurations | Where-Object {
@@ -2080,23 +2084,26 @@ function Remove-AzDtlBastion {
         $Lab = $Lab | Get-AzDtlLab
         $bastion = $Lab | Get-AzDtlBastion -LabVirtualNetworkId $LabVirtualNetworkId
   
-        Write-Host "Removing the bastion '$($bastion.Name)'."
-        $bastion | Remove-AzBastion -Force
-  
-        $VirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetworkId -ExpandedNetwork
-  
-        $bastion.IpConfigurations | ForEach-Object {
-  
-          if ($_.PublicIpAddress) {
-            Write-Host "Removing the Public Ip Address assigned to the Azure Bastion 'AzureBastionSubnet'."
-            Remove-AzureRmResource -ResourceId $_.PublicIpAddress.Id -Force
-          }
-  
-          if ($_.Subnet) {
-            Write-Host "Removing the subnet 'AzureBastionSubnet'."
-            $bastionSubnet = Get-AzureRmResource -ResourceId $_.Subnet.Id
-            Remove-AzureRmVirtualNetworkSubnetConfig -Name $bastionSubnet.Name -VirtualNetwork $VirtualNetwork
-            $VirtualNetwork | Set-AzureRmVirtualNetwork
+        if ($bastion) {
+
+          Write-Host "Removing the bastion '$($bastion.Name)'."
+          $bastion | Remove-AzBastion -Force
+
+          $VirtualNetwork = $Lab | Get-AzDtlLabVirtualNetworks -LabVirtualNetworkId $LabVirtualNetworkId -ExpandedNetwork
+
+          $bastion.IpConfigurations | ForEach-Object {
+    
+            if ($_.PublicIpAddress) {
+              Write-Host "Removing the Public Ip Address assigned to the Azure Bastion 'AzureBastionSubnet'."
+              Remove-AzureRmResource -ResourceId $_.PublicIpAddress.Id -Force
+            }
+    
+            if ($_.Subnet) {
+              Write-Host "Removing the subnet 'AzureBastionSubnet'."
+              $bastionSubnet = Get-AzureRmResource -ResourceId $_.Subnet.Id
+              Remove-AzureRmVirtualNetworkSubnetConfig -Name $bastionSubnet.Name -VirtualNetwork $VirtualNetwork
+              $VirtualNetwork | Set-AzureRmVirtualNetwork
+            }
           }
         }
 
