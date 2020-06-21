@@ -53,7 +53,32 @@ foreach($descr in $VmSettings) {
 
   Write-Host "Starting job to create a VM named $vmName"
 
-  $jobs += $lab | New-AzDtlVm -VmName $vmName `
+  $pipelineArgs = $lab.PsObject.Copy()
+  # Check if it's a generalized VM
+  if ($descr.osState -eq "Generalized") {
+    # Retrieve or generate an username
+    $username = if ($descr.PSobject.Properties.name -match "username") { $descr.username } else { Get-RandomString 10 }
+    $pipelineArgs | Add-Member -MemberType "NoteProperty" -Name "userName" -Value "$username" -Force
+    
+    # Retrieve or generate a password
+    if ($descr.credentialType -eq "Password"){
+      $password = if ($descr.PSobject.Properties.name -match "credentialValue") { $descr.credentialValue } else { Get-RandomString 25 }
+      $pipelineArgs | Add-Member -MemberType "NoteProperty" -Name "Password" -Value "$password"
+      $descr.credentialValue = $password 
+    }
+    # Using an SSH key
+    else{
+      $pipelineArgs | Add-Member -MemberType "NoteProperty" -Name "SshKey" -Value "$($descr.credentialValue)"
+    }
+    # Create or Update the CSV file
+    if (Test-Path .\credentials.csv) { 
+      (Import-Csv -Path .\credentials.csv) | Where-Object { $_.VMName -ne "$vmName" } | Export-Csv -NoTypeInformation -Path .\credentials.csv
+    }
+    $item = New-Object PSCustomObject -Property @{"VMName" = $vmName; "Username" = $username; "CredentialValue" = $descr.credentialValue }
+    Export-Csv -NoTypeInformation -InputObject $item -Path .\credentials.csv
+  }
+
+  $jobs += $pipelineArgs | New-AzDtlVm -VmName $vmName `
                               -Size $descr.size `
                               -StorageType $descr.storageType `
                               -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `

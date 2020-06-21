@@ -65,6 +65,29 @@ if ($PSCmdlet.ParameterSetName -eq "Storage") {
             Add-Member -InputObject $imageObj -MemberType NoteProperty -Name publisher -Value "Custom"
         }
 
+        # Generalized VMs Sanity checks
+        if ($imageObj.osState -eq "Generalized") {
+            # Unspecified credential type - a password should be generated 
+            if (-not ("credentialType" -in $imageObj.PSObject.Properties.Name)) {
+                Add-Member -InputObject $imageObj -MemberType NoteProperty -Name credentialType -Value "Password"
+            }
+            if ($imageObj.credentialType -ne "Password" -and $imageObj.credentialType -ne "SSHKey" ) {
+                throw "Invalid state for $($imageObj.imageName) : Invalid credentialType '$($imageObj.credentialType)'. Valid values are 'Password' or 'SSHKey'"
+            }
+
+            if ( $imageObj.credentialType -eq "SSHKey"){
+                if ($imageObj.osType -eq "Windows"){
+                    throw "Invalid state for $($imageObj.imageName) :  Windows-based VMs don't support SSH authentification"
+                }
+                # Catch an invalid key before attempting to deploy the VMs. The default Azure error is quite unclear
+                elseif ( -not ($imageObj.credentialValue.startsWith("ssh-rsa "))) {
+                    throw "Invalid state for $($imageObj.imageName) :  Invalid SSH key, only RSA keys are supported for authentification "
+                }   
+            }
+            if ($imageObj.credentialType -eq "SSHKey" -and $imageObj.credentialValue.startsWith("ssh-rsa ")  ) {
+                throw "Invalid state for $($imageObj.imageName) : "
+            }
+        }
         Add-Member -InputObject $imageObj -MemberType NoteProperty -Name sourceVhdUri -Value "$($SourceStorageContext.BlobEndPoint)$StorageContainerName/$($imageObj.vhdFileName)"
         $sourceImageInfos += $imageObj
     }
@@ -99,7 +122,8 @@ else {
     $sourceImageInfos = @()
 
     $images | ForEach-Object {
-        $sourceImageInfos += New-Object PSCustomObject -Property $_.Tags
+        $tags =  New-Object PSCustomObject -Property $_.Tags
+        $sourceImageInfos += Join-Tags $tags
     }
 
     $sourceImageInfos
