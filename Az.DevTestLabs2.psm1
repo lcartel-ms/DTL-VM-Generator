@@ -213,6 +213,11 @@ function DeployLab {
 
   $Name = $Lab.Name
   $ResourceGroupName = $Lab.ResourceGroupName
+  $VmCreationSubnetPrefix = $null
+
+  if (Get-Member -InputObject $Lab -Name VmCreationSubnetPrefix -MemberType Properties) {
+    $VmCreationSubnetPrefix = $Lab.VmCreationSubnetPrefix
+  }
 
   if ($Name.Length -gt 40) {
     $deploymentName = "LabDeploy_" + $Name.Substring(0, 40)
@@ -232,7 +237,7 @@ function DeployLab {
   $jsonPath = StringToFile($arm)
 
   $sb = {
-    param($deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz)
+    param($deploymentName, $Name, $ResourceGroupName, $VmCreationSubnetPrefix, $jsonPath, $Parameters, $workingDir, $justAz)
 
     if($justAz) {
       Enable-AzureRmAlias -Scope Local -Verbose:$false
@@ -245,16 +250,29 @@ function DeployLab {
       $Mutex.ReleaseMutex() | Out-Null
     }
 
+    # Import again the module
+    Import-Module "$workingDir\Az.DevTestLabs2.psm1"
+
     $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -TemplateParameterObject $Parameters
     Write-debug "Deployment succeded with deployment of `n$deployment"
 
-    Get-AzureRmResource -Name $Name -ResourceGroupName $ResourceGroupName -ExpandProperties
+    $lab = Get-AzureRmResource -Name $Name -ResourceGroupName $ResourceGroupName -ExpandProperties
+    if ($VmCreationSubnetPrefix) {
+
+      $labVnet = $lab | Get-AzDtlLabVirtualNetworks -ExpandedNetwork
+      $labVnet.Subnets[0].AddressPrefix = $VmCreationSubnetPrefix
+      $labVnet = Set-AzureRmVirtualNetwork -VirtualNetwork $labVnet
+
+      $lab = Get-AzureRmResource -Name $Name -ResourceGroupName $ResourceGroupName -ExpandProperties
+    }
+
+    $lab
   }
 
   if($AsJob) {
-    Start-Job      -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz
+    Start-Job      -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $VmCreationSubnetPrefix, $jsonPath, $Parameters, $PWD, $justAz
   } else {
-    Invoke-Command -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz
+    Invoke-Command -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $VmCreationSubnetPrefix, $jsonPath, $Parameters, $PWD, $justAz
   }
 }
 
@@ -494,6 +512,10 @@ function New-AzDtlLab {
     [ValidateNotNullOrEmpty()]
     [string] $ResourceGroupName,
 
+    [parameter(Mandatory=$false,HelpMessage="IP address prefix (CIDR notation) within 10.0.0.0/20 reserved for VMs creation. (e.g 10.0.0.0/21, 10.)")]
+    [ValidateNotNullOrEmpty()]
+    [string] $VmCreationSubnetPrefix,
+
     [parameter(Mandatory=$false,HelpMessage="Run the command in a separate job.")]
     [switch] $AsJob = $False
   )
@@ -505,6 +527,11 @@ function New-AzDtlLab {
       # Choose to keep it as simple as possible to start with.
       Get-AzureRmResourceGroup -Name $ResourceGroupName -ErrorAction Stop | Out-Null
 
+      $CIDRIPv4Regex = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(3[0-2]|[1-2][0-9]|[0-9]))$"
+      if (!($VmCreationSubnetPrefix -match $CIDRIPv4Regex)) {
+        throw "Not a valid CIDR IPv4 address range"
+      }
+
       $params = @{
         newLabName = $Name
       }
@@ -513,6 +540,10 @@ function New-AzDtlLab {
       $Lab = [pscustomobject] @{
         Name = $Name
         ResourceGroupName = $ResourceGroupName
+      }
+
+      if ($VmCreationSubnetPrefix) {
+        $Lab | Add-member -Name 'VmCreationSubnetPrefix' -Value $VmCreationSubnetPrefix -MemberType NoteProperty
       }
 
 # Taken from official sample here: https://github.com/Azure/azure-devtestlab/blob/master/Samples/101-dtl-create-lab/azuredeploy.json
@@ -4149,7 +4180,7 @@ Export-ModuleMember -Function New-AzDtlLab,
                               New-AzDtlLabEnvironment,
                               Get-AzDtlLabEnvironment,
                               Set-AzDtlShutdownPolicy,
-                              Set-AzDtlLabBrowserConnect,
+                              Set-AzDtlLabBrowserConnect, 
                               Set-AzDtlVmAutoStart,
                               Set-AzDtlVmShutdownSchedule,
                               Set-AzDtlLabIpPolicy,
