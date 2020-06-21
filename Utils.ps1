@@ -318,6 +318,9 @@ function Get-VirtualNetworkUnallocatedSpace {
 }
 
 # Get the first available subnet with a unassigned address space large enough to host a new subnet of at least /$Length
+# Note: Resizing a Subnet with existing IP Configurations is not currently supported.
+# You must first move the IP configurations to another temporary VNet or subnet.
+# https://docs.microsoft.com/bs-latn-ba/azure/virtual-network/virtual-network-manage-subnet#change-subnet-settings
 function Get-VirtualNetworkUnassignedSpace {
   [CmdletBinding()]
   param(    
@@ -365,8 +368,11 @@ function Get-VirtualNetworkUnassignedSpace {
 
       $assignedIPs = $vnetSubnet.IpConfigurations | Select-Object -ExpandProperty PrivateIpAddress
       if ($assignedIPs) {
-        $lowestAssignedIp = [Linq.Enumerable]::Min([string[]] $assignedIPs, [Func[string,int]] { param ($ip); $ip | Convert-IPToDecimal })
-        $highestAssignedIp = [Linq.Enumerable]::Max([string[]] $assignedIPs, [Func[string,int]] { param ($ip); $ip | Convert-IPToDecimal })
+        $lowestAssignedIpDecimal = [Linq.Enumerable]::Min([string[]] $assignedIPs, [Func[string,int]] { param ($ip); $ip | Convert-IPToDecimal })
+        $highestAssignedIpDecimal = [Linq.Enumerable]::Max([string[]] $assignedIPs, [Func[string,int]] { param ($ip); $ip | Convert-IPToDecimal })
+      
+        $lowestAssignedIp = $lowestAssignedIpDecimal | Convert-DecimalToIP
+        $highestAssignedIp = $highestAssignedIpDecimal | Convert-DecimalToIP
       }
 
       # TODO we can also consider getting the minimum address length large enough instead than halving the space in /Length+1
