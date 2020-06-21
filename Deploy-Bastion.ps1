@@ -13,7 +13,11 @@ param
 
     [ValidateSet("Delete","Leave","Error")]
     [Parameter(Mandatory=$false, HelpMessage="What to do if a VM with the same name exist in the lab (Delete, Leave, Error)")]
-    [string] $IfExist = "Leave"
+    [string] $IfExist = "Leave",
+
+    [Parameter(valueFromRemainingArguments=$true)]
+    [String[]]
+    $rest = @()
 )
 
 $ErrorActionPreference = "Stop"
