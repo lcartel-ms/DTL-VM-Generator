@@ -16,16 +16,12 @@ param
     [string] $StorageAccountName,
 
     [ValidateNotNullOrEmpty()]
+    [Parameter(Mandatory=$true, HelpMessage="The resource group for the storage account")]
+    [string] $StorageAccountResourceGroupName,
+
+    [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
     [string] $StorageContainerName,
-
-    [ValidateNotNullOrEmpty()]
-    [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
-    [string] $StorageAccountKey,
-
-    [ValidateNotNullOrEmpty()]
-    [Parameter(Mandatory=$true, HelpMessage="The resource ID for the storage account where custom images are stored")]
-    [string] $StorageAccountResourceId,
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$true, HelpMessage="The resource group name for the Shared Image Gallery, only required if the SIG doesn't already exist")]
@@ -218,6 +214,15 @@ if (-not $ImageDefinitions) {
     # If the image definitions variable is null, we need to make it an empty list
     $ImageDefinitions = @()
 }
+
+# Get the Storage account (confirm it exists)
+$StorageAcct = Get-AzstorageAccount -Name $StorageAccountName -ResourceGroupName $StorageAccountResourceGroup
+if (-not $StorageAcct) {
+    Write-Error "Unable to find storage account"
+}
+
+$StorageAccountResourceId = $StorageAcct.Id
+$StorageAccountKey = (Get-AzstorageAccountKey -Name $StorageAccountName -ResourceGroupName $StorageAccountResourceGroup)[0].Value
 
 # Get the list of JSON files in the storage account
 $VmSettings = & "./Import-VmSetting" -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey

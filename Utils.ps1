@@ -462,6 +462,15 @@ function Get-RandomString {
     | ForEach-Object { [char]$_ })
 }
 
+# Generate password lifted from this location: https://blogs.technet.microsoft.com/heyscriptingguy/2015/11/05/generate-random-letters-with-powershell/
+Function Get-NewPassword() {
+    Param(
+        [int]$length=40
+    )
+    # NOTE: this excludes commas and some other special characters
+    return (-join ((48..57) + (65..90) + (97..122) | Get-Random -Count $length | % {[char]$_}))
+}
+
 function Split-Tags {
   param
   (

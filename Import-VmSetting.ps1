@@ -14,12 +14,18 @@ param
 
     [ValidateNotNullOrEmpty()]
     [Parameter(ParameterSetName='sharedImageGallery', Mandatory=$true, HelpMessage="The name of the SharedImageGallery that contains the image definitions & image versions for the labs")]
-    [string] $SharedImageGalleryName
+    [string] $SharedImageGalleryName,
+    
+    [Parameter(HelpMessage="Include secrets (usernames/passwords/SSH keys) for the VMs, these will be generated if not available in credentials.csv")]
+    [switch] $IncludeSecrets
+
 )
 
 $ErrorActionPreference = 'Stop'
 
 . "./Utils.ps1"
+
+$sourceImageInfos = @()
 
 if ($PSCmdlet.ParameterSetName -eq "Storage") {
 
@@ -40,8 +46,6 @@ if ($PSCmdlet.ParameterSetName -eq "Storage") {
         Remove-Item $downloadFolder -Recurse | Out-Null
     }
     New-Item -Path $downloadFolder -ItemType Directory | Out-Null
-
-    $sourceImageInfos = @()
 
     $jsonBlobs | Get-AzStorageBlobContent -Destination $downloadFolder | Out-Null
     $downloadedFileNames = Get-ChildItem -Path $downloadFolder
@@ -64,35 +68,9 @@ if ($PSCmdlet.ParameterSetName -eq "Storage") {
         if (-not ("publisher" -in $imageObj.PSObject.Properties.Name)) {
             Add-Member -InputObject $imageObj -MemberType NoteProperty -Name publisher -Value "Custom"
         }
-
-        # Generalized VMs Sanity checks
-        if ($imageObj.osState -eq "Generalized") {
-            # Unspecified credential type - a password should be generated 
-            if (-not ("credentialType" -in $imageObj.PSObject.Properties.Name)) {
-                Add-Member -InputObject $imageObj -MemberType NoteProperty -Name credentialType -Value "Password"
-            }
-            if ($imageObj.credentialType -ne "Password" -and $imageObj.credentialType -ne "SSHKey" ) {
-                throw "Invalid state for $($imageObj.imageName) : Invalid credentialType '$($imageObj.credentialType)'. Valid values are 'Password' or 'SSHKey'"
-            }
-
-            if ( $imageObj.credentialType -eq "SSHKey"){
-                if ($imageObj.osType -eq "Windows"){
-                    throw "Invalid state for $($imageObj.imageName) :  Windows-based VMs don't support SSH authentification"
-                }
-                # Catch an invalid key before attempting to deploy the VMs. The default Azure error is quite unclear
-                elseif ( -not ($imageObj.credentialValue.startsWith("ssh-rsa "))) {
-                    throw "Invalid state for $($imageObj.imageName) :  Invalid SSH key, only RSA keys are supported for authentification "
-                }   
-            }
-            if ($imageObj.credentialType -eq "SSHKey" -and $imageObj.credentialValue.startsWith("ssh-rsa ")  ) {
-                throw "Invalid state for $($imageObj.imageName) : "
-            }
-        }
-        Add-Member -InputObject $imageObj -MemberType NoteProperty -Name sourceVhdUri -Value "$($SourceStorageContext.BlobEndPoint)$StorageContainerName/$($imageObj.vhdFileName)"
+        
         $sourceImageInfos += $imageObj
     }
-
-    $sourceImageInfos
 }
 else {
     # Get the Shared Image Gallery
@@ -119,13 +97,114 @@ else {
 
     Write-Host "Compiling settings from $(($images | Measure-Object).Count) image definitions"
 
-    $sourceImageInfos = @()
-
     $images | ForEach-Object {
         $tags =  New-Object PSCustomObject -Property $_.Tags
         $sourceImageInfos += Join-Tags $tags
     }
-
-    $sourceImageInfos
-    
 }
+
+# Get the secrets if requested, or generate them if they don't exist
+if ($IncludeSecrets) {
+
+    $credentials = @()
+    
+    # Read in the generated CSV file if it exists
+    if (Test-Path "./credentials.csv") {
+        $credCSV = Import-Csv -Path "./credentials.csv"
+    }
+
+    # We only look at the source image infos for Generalized os type
+    $generalizedInfos = $sourceImageInfos | Where-Object {$_.osState -eq "Generalized"}
+
+    # iterate through the $sourceImageInfos and make sure we have creds for each of them
+    foreach ($info in $generalizedInfos) {
+
+        if ((Test-Path variable:credCSV) -and ($credCSV | Where-Object {$_.imageName -eq $info.imageName})) {
+            # We have a credential object for this source image info!            
+            $cred = $credCSV | Where-Object {$_.imageName -eq $info.imageName}
+        }
+        else {
+            $cred = New-Object PSObject -Property @{
+                        imageName = $info.imageName
+                    }
+        }
+
+        # Must have a username
+        if (-not ($cred.PSObject.Properties -match "Username")) {
+            Add-Member -InputObject $cred -MemberType NoteProperty -Name "Username" -Value (Get-RandomString -length 8)
+        }
+        elseif (-not ($cred.Username)) {
+            $cred.Username = Get-RandomString -length 8
+        }
+
+        # if OS is windows, must have a password
+        if ($info.osType -eq "Windows") {
+            
+            # Handle credential type
+            if (-not ($cred.PSObject.Properties -match "CredentialType")) {
+                Add-Member -InputObject $cred -MemberType NoteProperty -Name "CredentialType" -value "Password"
+            }
+            elseif ($cred.CredentialType -ne "Password") {
+                $cred.CredentialType = "Password"
+            }
+
+            # If value doesn't exist or is blank, create a password
+            if (-not ($cred.PSObject.Properties -match "CredentialValue")) {
+                Add-Member -InputObject $cred -MemberType NoteProperty -Name "CredentialValue" -Value (Get-NewPassword -length 20)
+            }
+            elseif (-not ($cred.CredentialValue)) {
+                # If password is blank, generate one
+                $cred.CredentialValue = (Get-NewPassword -length 20)
+            }
+
+        }
+        else {
+            # For Linux, we can have either a SSH key or a password
+
+            # If credential type doesn't exist, create a password
+            if (-not ($cred.PSObject.Properties -match "CredentialType")) {
+                Add-Member -InputObject $cred -MemberType NoteProperty -Name "CredentialType" -value "Password"
+            }
+
+            # Validate we have a password
+            if ($cred.CredentialType -eq "Password") {
+                # If value doesn't exist, create a password
+                if (-not ($cred.PSObject.Properties -match "CredentialValue")) {
+                    Add-Member -InputObject $cred -MemberType NoteProperty -Name "CredentialValue" -Value (Get-NewPassword -length 20)
+                }
+                elseif (-not ($cred.CredentialValue)) {
+                    # If password is blank, generate one
+                    $cred.CredentialValue = (Get-NewPassword -length 20)
+                }
+            }
+
+            # Validate the SSH key
+            if ($cred.CredentialType -eq "SSHKey") {
+                # If value doesn't exist, throw an error
+                if (-not ($cred.PSObject.Properties -match "CredentialValue")) {
+                    Write-Error "$($cred.imageName) must have a credential value when credential type is 'SSHKey'"
+                }
+                elseif (-not ($cred.CredentialValue.startsWith("ssh-rsa "))) {
+                    Write-Error "$($cred.imageName) SSH key must start with 'ssh-rsa '.  Invalid key, only RSA keys are supported for authentification"
+                }
+            }
+        }
+
+        # Add to an object to export later
+        $credentials += $cred
+
+        # Add all the properties to the Source Image Infos
+        Add-Member -InputObject $info -MemberType NoteProperty -Name "Username" $cred.Username
+        if ($cred.CredentialType -eq "SSHKey") {
+            Add-Member -InputObject $info -MemberType NoteProperty -Name "SSHKey" $cred.CredentialValue
+        }
+        else {
+            Add-Member -InputObject $info -MemberType NoteProperty -Name "Password" $cred.CredentialValue
+        }
+
+    }
+
+    $credentials | Export-Csv -Path "./credentials.csv"
+}
+
+$sourceImageInfos
