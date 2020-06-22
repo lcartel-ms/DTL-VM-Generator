@@ -68,7 +68,9 @@ if ($PSCmdlet.ParameterSetName -eq "Storage") {
         if (-not ("publisher" -in $imageObj.PSObject.Properties.Name)) {
             Add-Member -InputObject $imageObj -MemberType NoteProperty -Name publisher -Value "Custom"
         }
-        
+
+        Add-Member -InputObject $imageObj -MemberType NoteProperty -Name sourceVhdUri -Value "$($SourceStorageContext.BlobEndPoint)$StorageContainerName/$($imageObj.vhdFileName)"
+
         $sourceImageInfos += $imageObj
     }
 }
