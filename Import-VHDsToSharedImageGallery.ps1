@@ -17,7 +17,7 @@ param
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$true, HelpMessage="The resource group for the storage account")]
-    [string] $StorageAccountResourceGroupName,
+    [string] $StorageAccountResourceGroup,
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
