@@ -36,10 +36,19 @@ $configCount = ($config | Measure-Object).Count
 Write-Host "---------------------------------" -ForegroundColor Green
 Write-Host "Creating $configCount labs..." -ForegroundColor Green
 $labCreateJobs = $config | ForEach-Object {
-                                $_ | New-AzDtlLab -AsJob
+                                $_ | New-AzDtlLab -VmCreationSubnetPrefix "10.0.0.0/21" -AsJob
                                 Start-Sleep -Seconds $SecondsBetweenLoop
                            }
 Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
+
+$configBastion = [Array] ($config | Where-Object { $_.BastionEnabled })
+if (($configBastion | Measure-Object).Count -gt 0) {
+    # Deploy the Azure Bastion hosts to the labs
+    Write-Host "---------------------------------" -ForegroundColor Green
+    Write-Host "Deploying $($configBastion.Count) Bastion hosts to the labs..." -ForegroundColor Green
+    # Currently use Leave strategy for existing Bastions
+    "./Deploy-Bastion.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -SecTimeout (8 * 60 * 60) -CustomRole $null -ModulesToImport $AzDtlModulePath
+}
 
 # Update the shutdown policy on the labs
 Write-Host "---------------------------------" -ForegroundColor Green
