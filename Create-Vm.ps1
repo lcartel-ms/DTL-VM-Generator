@@ -69,6 +69,6 @@ Write-Host "Creating ... $toCreate"
 & "./Import-CustomImage.ps1" -VmSettings $toCreate -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
 & "./Set-Vm.ps1" -VmSettings $toCreate -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -LabIpConfig $LabIpConfig -IfExist $IfExist
 & "./Remove-SnapshotsForLab.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
-& "./Set-Network.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VMsToConfigure $selected -VmSettings $VmSettings
+& "./Set-Network.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VmSettings $VmSettings -SharedIps $LabIpConfig
 
 return "Creation seemed to have worked fine for $DevTestLabName"
