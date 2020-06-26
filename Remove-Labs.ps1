@@ -19,10 +19,10 @@ $bastionLabConfigCount = ($bastionLabConfig | Measure-Object).Count
 if ($bastionLabConfigCount -gt 0) {
     Write-Host "---------------------------------" -ForegroundColor Green
     Write-Host "Removing Bastion hosts from the following $bastionLabConfigCount labs..." -ForegroundColor Green
-    $labConfig | Select-Object DevTestLabName, ResourceGroupName | Format-Table | Out-String | Write-Host
+    $labConfig | Select-Object DevTestLabName, ResourceGroupName, BastionEnabled | Format-Table | Out-String | Write-Host
     
     $bastionRemoveJobs = $bastionLabConfig | Get-AzDtlLab | Remove-AzDtlBastion -AsJob
-    Wait-JobWithProgress -jobs $bastionRemoveJobs -secTimeout 1200
+    Wait-JobWithProgress -jobs $bastionRemoveJobs -secTimeout 1800
 
     Write-Host "Completed removing Bastion hosts from Labs!" -ForegroundColor Green
 }
@@ -33,7 +33,11 @@ if ($labConfigCount -gt 0) {
     $labConfig | Select-Object DevTestLabName, ResourceGroupName | Format-Table | Out-String | Write-Host
 
     $labRemoveJobs = $labConfig | Get-AzDtlLab | Remove-AzDtlLab -AsJob
-    Wait-JobWithProgress -jobs $labRemoveJobs -secTimeout 1200
+
+    # Special case, if the labs no longer exist, we don't get jobs back, so we can skip this
+    if ($labRemoveJobs) {
+        Wait-JobWithProgress -jobs $labRemoveJobs -secTimeout 3600
+    }
 
     Write-Host "Completed removing labs!" -ForegroundColor Green
 }
