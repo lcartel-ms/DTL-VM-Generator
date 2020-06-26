@@ -22,8 +22,10 @@ if ($bastionLabConfigCount -gt 0) {
     $labConfig | Select-Object DevTestLabName, ResourceGroupName, BastionEnabled | Format-Table | Out-String | Write-Host
     
     $bastionRemoveJobs = $bastionLabConfig | Get-AzDtlLab | Remove-AzDtlBastion -AsJob
-    Wait-JobWithProgress -jobs $bastionRemoveJobs -secTimeout 1800
-
+    if ($bastionRemoveJobs) {
+        Wait-JobWithProgress -jobs $bastionRemoveJobs -secTimeout 1800
+    }
+    
     Write-Host "Completed removing Bastion hosts from Labs!" -ForegroundColor Green
 }
 

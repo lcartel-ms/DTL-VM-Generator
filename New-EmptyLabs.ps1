@@ -41,6 +41,13 @@ $labCreateJobs = $config | ForEach-Object {
                            }
 Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
 
+# Update the IP Policy on the labs
+Write-Host "---------------------------------" -ForegroundColor Green
+Write-Host "Updating $configCount labs with IP Policy ..." -ForegroundColor Green
+$config | ForEach-Object {
+    Set-AzDtlLabIpPolicy -Lab $_ -IpConfig $_.IpConfig
+}
+
 $configBastion = [Array] ($config | Where-Object { $_.BastionEnabled })
 if (($configBastion | Measure-Object).Count -gt 0) {
     # Deploy the Azure Bastion hosts to the labs
@@ -54,13 +61,6 @@ if (($configBastion | Measure-Object).Count -gt 0) {
 Write-Host "---------------------------------" -ForegroundColor Green
 Write-Host "Updating $configCount labs with correct shutdown policy..." -ForegroundColor Green
 Wait-JobWithProgress -jobs ($config | Set-AzDtlLabShutdown -AsJob) -secTimeout 300
-
-# Update the IP Policy on the labs
-Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Updating $configCount labs with IP Policy ..." -ForegroundColor Green
-$config | ForEach-Object {
-    Set-AzDtlLabIpPolicy -Lab $_ -IpConfig $_.IpConfig
-}
 
 # Add appropriate owner/user permissions for the labs
 Write-Host "---------------------------------" -ForegroundColor Green
