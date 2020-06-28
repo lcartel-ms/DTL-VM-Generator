@@ -84,7 +84,7 @@ function MyGetResourceLab {
       Get-AzureRmResource -ExpandProperties -resourcetype $ResourceType -ResourceGroupName $ResourceGroupName -ApiVersion "2018-10-15-preview" -EA SilentlyContinue | Where-Object { $_.ResourceId -like "*/labs/$Name"}
     }
   } else { # Wild RG forces client side query anyhow
-    Get-AzureRmResource -ExpandProperties -resourcetype $ResourceType -ApiVersion "2018-10-15-preview" -EA SilentlyContinue | Where-Object { $_.ResourceId -like "*/resourcegroups/$ResourceGroupName/*/labs/$Name"}
+    Get-AzureRmResource -ExpandProperties -resourcetype $ResourceType -EA SilentlyContinue | Where-Object { $_.ResourceId -like "*/resourcegroups/$ResourceGroupName/*/labs/$Name"}
   }
 }
 

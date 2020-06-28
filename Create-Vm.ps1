@@ -70,5 +70,6 @@ Write-Host "Creating ... $toCreate"
 & "./Set-Vm.ps1" -VmSettings $toCreate -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -LabIpConfig $LabIpConfig -IfExist $IfExist
 & "./Remove-SnapshotsForLab.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
 & "./Set-Network.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VmSettings $VmSettings -LabIpConfig $LabIpConfig
+& "./Stop-LabVms.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VmSettings $selected
 
 return "Creation seemed to have worked fine for $DevTestLabName"
