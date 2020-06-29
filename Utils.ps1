@@ -100,42 +100,69 @@ function Set-LabAccessControl {
   )
 
   foreach ($owneremail in $ownAr) {
-    $ra = New-AzRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
-
-    # if we couldn't apply the role assignment, it's likely because we couldn't find the user
-    # instead let's search aad for them, this only works if we have the AzureAd module installed
-    if (-not $ra) {
-        $user = Get-AzureADUser -Filter "Mail eq '$owneremail'" -ErrorAction SilentlyContinue
-        if ($user) {
-            $ra = New-AzRoleAssignment -ObjectId $user.ObjectId -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
-        }
-    }
-
+    # First see if the role assignment already exists, if so, just log it
+    $ra = Get-AzRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
     if ($ra) {
-        Write-Host "$owneremail added as Owner in Lab '$DevTestLabName'"
+        Write-Host "Role assignment for owner $owneremail already exists in lab $DevTestLabName, skipping... "
     }
     else {
-        Write-Host "Unable to add $owneremail as Owner in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
+        $ra = New-AzRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
+
+        # if we couldn't apply the role assignment, it's likely because we couldn't find the user
+        # instead let's search aad for them, this only works if we have the AzureAd module installed
+        if (-not $ra) {
+            $user = Get-AzureADUser -Filter "Mail eq '$owneremail'" -ErrorAction SilentlyContinue
+            if ($user) {
+                $ra = Get-AzRoleAssignment -ObjectId $user.ObjectId -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
+                if ($ra) {
+                    Write-Host "Role assignment for owner $owneremail already exists in lab $DevTestLabName, skipping... "
+                }
+                else {
+                    $ra = New-AzRoleAssignment -ObjectId $user.ObjectId -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
+                }
+            }
+        }
+
+        if ($ra) {
+            Write-Host "$owneremail added as Owner in Lab '$DevTestLabName'"
+        }
+        else {
+            Write-Host "Unable to add $owneremail as Owner in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
+        }
     }
   }
 
   foreach ($useremail in $userAr) {
-    $ra = New-AzRoleAssignment -SignInName $useremail -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
-
-    # if we couldn't apply the role assignment, it's likely because we couldn't find the user
-    # instead let's search aad for them, this only works if we have the AzureAd module installed
-    if (-not $ra) {
-        $user = Get-AzureADUser -Filter "Mail eq '$useremail'" -ErrorAction SilentlyContinue
-        if ($user) {
-            $ra = New-AzRoleAssignment -ObjectId $user.ObjectId -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
-        }
-    }
+    # First see if the role assignment already exists, if so just log it
+    $ra = Get-AzRoleAssignment -SignInName $useremail -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
 
     if ($ra) {
-        Write-Host "$useremail added as $customRole in Lab '$DevTestLabName'"
+        Write-Host "Role assignment for user $useremail already exists in lab $DevTestLabName, skipping... "
     }
     else {
-        Write-Host "Unable to add $useremail as $customRole in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
+        $ra = New-AzRoleAssignment -SignInName $useremail -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
+
+        # if we couldn't apply the role assignment, it's likely because we couldn't find the user
+        # instead let's search aad for them, this only works if we have the AzureAd module installed
+        if (-not $ra) {
+            $user = Get-AzureADUser -Filter "Mail eq '$useremail'" -ErrorAction SilentlyContinue
+            if ($user) {
+                $ra = Get-AzRoleAssignment -ObjectId $user.ObjectId -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
+                if ($ra) {
+                    Write-Host "Role assignment for user $useremail already exists in lab $DevTestLabName, skipping... "
+                }
+                else {
+                    $ra = New-AzRoleAssignment -ObjectId $user.ObjectId -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
+                }
+            }
+        }
+
+        if ($ra) {
+            Write-Host "$useremail added as $customRole in Lab '$DevTestLabName'"
+        }
+        else {
+            Write-Host "Unable to add $useremail as $customRole in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
+        }
     }
   }
 }

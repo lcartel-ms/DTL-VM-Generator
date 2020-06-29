@@ -76,7 +76,7 @@ $selectedVms | ForEach-Object {
     $rg = Get-AzResourceGroup | Out-Null
     $Mutex.ReleaseMutex() | Out-Null
 
-    Remove-AzDtlVm -Vm $Using:_
+    Remove-AzDtlVm -Vm $_
   }
   $jobs += Start-RSJob -ScriptBlock $sb -Name $_.Name -ModulesToImport $AzDtlModulePath
 
