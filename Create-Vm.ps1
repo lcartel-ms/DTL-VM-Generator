@@ -9,16 +9,8 @@ param
     [string] $ResourceGroupName,
 
     [ValidateNotNullOrEmpty()]
-    [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
-    [string] $StorageAccountName,
-
-    [ValidateNotNullOrEmpty()]
-    [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
-    [string] $StorageContainerName,
-
-    [ValidateNotNullOrEmpty()]
-    [Parameter(Mandatory=$true, HelpMessage="The storage key for the storage account where custom images are stored")]
-    [string] $StorageAccountKey,
+    [Parameter(Mandatory=$true, HelpMessage="The Name of the Shared Image Gallery attached to the lab")]
+    [string] $SharedImageGalleryName,
 
     [parameter(Mandatory=$true, HelpMessage="Public=separate IP Address, Shared=load balancers optimizes IP Addresses, Private=No public IP address.")]
     [string] $LabIpConfig,
@@ -47,7 +39,7 @@ $Mutex.ReleaseMutex() | Out-Null
 
 Write-Host "Start setting VMs in $DevTestLabName ..."
 
-$VmSettings = & "./Import-VmSetting" -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
+$VmSettings = & "./Import-VmSetting" -SharedImageGalleryName $SharedImageGalleryName
 if(-not $vmSettings) {
   throw "VM Settings are null"
 }
@@ -66,10 +58,8 @@ if(-not $toCreate) {
 
 Write-Host "Creating ... $toCreate"
 
-& "./Import-CustomImage.ps1" -VmSettings $toCreate -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
-& "./Set-Vm.ps1" -VmSettings $toCreate -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -LabIpConfig $LabIpConfig -IfExist $IfExist
-& "./Remove-SnapshotsForLab.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName
-& "./Set-Network.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VmSettings $VmSettings -LabIpConfig $LabIpConfig
+& "./Set-Vm.ps1" -VmSettings $toCreate -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -SharedImageGalleryName $SharedImageGalleryName  -LabIpConfig $LabIpConfig -IfExist $IfExist
+& "./Set-Network.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VmSettings $toCreate -LabIpConfig $LabIpConfig
 & "./Stop-LabVms.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VmSettings $selected
 
 return "Creation seemed to have worked fine for $DevTestLabName"

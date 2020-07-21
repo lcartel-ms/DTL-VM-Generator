@@ -776,9 +776,7 @@ function Invoke-RSForEachLab {
     $params = "@{
       DevTestLabName='$($lab.DevTestLabName)';
       ResourceGroupName='$($lab.ResourceGroupName)';
-      StorageAccountName='$($lab.StorageAccountName)';
-      StorageContainerName='$($lab.StorageContainerName)';
-      StorageAccountKey='$($lab.StorageAccountKey)';
+      SharedImageGalleryName='$($lab.SharedImageGalleryName)';
       ShutDownTime='$($lab.ShutDownTime)';
       TimezoneId='$($lab.TimezoneId)';
       LabRegion='$($lab.LabRegion)';
