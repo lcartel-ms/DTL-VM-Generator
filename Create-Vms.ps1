@@ -12,13 +12,27 @@ param
 
     [ValidateSet("Delete","Leave","Error")]
     [Parameter(Mandatory=$true, HelpMessage="What to do if a VM with the same name exist in the lab (Delete, Leave, Error)")]
-    [string] $IfExist
+    [string] $IfExist,
+
+    [Parameter(Mandatory=$false, HelpMessage="Once the VMs are created, apply Windows Updates?")]
+    [bool] $ApplyWindowsUpdates = $false
 )
 
 $ErrorActionPreference = "Stop"
 
-. "./Utils.ps1"
+# Common setup for scripts
+. "./Utils.ps1"                                          # Import all our utilities
+Import-AzDtlModule                                       # Import the DTL Library
 
-Import-AzDtlModule
+Write-Host "---------------------------------" -ForegroundColor Green
+Write-Host "Creating VMs..." -ForegroundColor Green
 
 "./Create-Vm.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -CustomRole $null -ImagePattern $ImagePattern -IfExist $IfExist -ModulesToImport $AzDtlModulePath
+
+if ($ApplyWindowsUpdates) {
+    ./Apply-WindowsUpdateArtifactToVMs.ps1 -ConfigFile $ConfigFile -ImagePattern $ImagePattern -shutdownVMs $true
+}
+
+Write-Host "Completed creating VMs!" -ForegroundColor Green
+
+Remove-AzDtlModule                                       # Remove the DTL Library

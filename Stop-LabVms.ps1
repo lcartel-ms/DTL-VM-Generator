@@ -7,11 +7,17 @@ param
   [string] $ResourceGroupName
 )
 
+$ErrorActionPreference = "Stop"
+
+# Common setup for scripts
+. "./Utils.ps1"                                          # Import all our utilities
+Import-AzDtlModule                                       # Import the DTL Library
+
 Write-Host "Stopping VMs in $DevTestLabName in RG $ResourceGroupName ..."
 Write-Host "This might take a while ..."
 
 # Get only the running VMs
-$existingLab = Get-AzDtlLab -Name $DevTestLabName  -ResourceGroupName $ResourceGroupName
+$existingLab = Get-AzDtlLab -Name $DevTestLabName -ResourceGroupName $ResourceGroupName
 
 if (-not $existingLab) {
     throw "'$DevTestLabName' doesn't exist"
@@ -20,24 +26,21 @@ if (-not $existingLab) {
 $runningVms = Get-AzDtlVm -Lab $existingLab -Status "Running"
 
 if (-not $runningVms) {
-  throw "'$DevTestLabName' doesn't contain any VMs"
+  Write-Host "'$DevTestLabName' doesn't contain any running VMs"
+  return
 }
 
 $jobs = @()
 $runningVms | ForEach-Object {
+  $sb = {
+    # Workaround for https://github.com/Azure/azure-powershell/issues/9448
+    $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
+    $Mutex.WaitOne() | Out-Null
+    $rg = Get-AzResourceGroup | Out-Null
+    $Mutex.ReleaseMutex() | Out-Null
 
-  $sb = [scriptblock]::create(
-    @"
-    Stop-AzDtlVm $_
-    
-    if ($returnStatus.Status -eq 'Succeeded') {
-      Write-Output "Successfully stopped DTL machine: $dtlName"
-    }
-    else {
-      throw "Failed to stop DTL machine: $dtlName"
-    }
-"@)
-
+    Stop-AzDtlVm -Vm $Using:_
+  }
   $jobs += Start-RSJob -ScriptBlock $sb -Name $_.Name -ModulesToImport $AzDtlModulePath
 
   Start-Sleep -Seconds 2

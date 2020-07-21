@@ -34,19 +34,24 @@ function Import-RemoteModule {
 
   $modulePath = Join-Path -Path (Resolve-Path ./) -ChildPath $ModuleName
 
+  # WORKAROUND: Use a checked-in version of the library temporarily
   if (Test-Path -Path $modulePath) {
     # if the file exists, delete it - just in case there's a newer version, we always download the latest
-    Remove-Item -Path $modulePath
-}
+    # Remove-Item -Path $modulePath
+  }
 
-  $WebClient = New-Object System.Net.WebClient
-  $WebClient.DownloadFile($Source, $modulePath)
+  # $WebClient = New-Object System.Net.WebClient
+  # $WebClient.DownloadFile($Source, $modulePath)
 
-  Import-Module $modulePath
+  Import-Module $modulePath -Force
 }
 
 function Import-AzDtlModule {
   Import-RemoteModule -Source $AzDtlModuleSource -ModuleName $AzDtlModuleName
+}
+
+function Remove-AzDtlModule {
+  Remove-Module -Name "Az.DevTesTLabs2" -ErrorAction SilentlyContinue
 }
 
 function Set-LabAccessControl {
@@ -59,13 +64,43 @@ function Set-LabAccessControl {
   )
 
   foreach ($owneremail in $ownAr) {
-    New-AzRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
-    Write-Host "$owneremail added as Owner"
+    $ra = New-AzRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
+
+    # if we couldn't apply the role assignment, it's likely because we couldn't find the user
+    # instead let's search aad for them, this only works if we have the AzureAd module installed
+    if (-not $ra) {
+        $user = Get-AzureADUser -Filter "Mail eq '$owneremail'" -ErrorAction SilentlyContinue
+        if ($user) {
+            $ra = New-AzRoleAssignment -ObjectId $user.ObjectId -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
+        }
+    }
+
+    if ($ra) {
+        Write-Host "$owneremail added as Owner in Lab '$DevTestLabName'"
+    }
+    else {
+        Write-Host "Unable to add $owneremail as Owner in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
+    }
   }
 
   foreach ($useremail in $userAr) {
-    New-AzRoleAssignment -SignInName $useremail -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' | Out-Null
-    Write-Host "$useremail added as $customRole"
+    $ra = New-AzRoleAssignment -SignInName $useremail -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
+
+    # if we couldn't apply the role assignment, it's likely because we couldn't find the user
+    # instead let's search aad for them, this only works if we have the AzureAd module installed
+    if (-not $ra) {
+        $user = Get-AzureADUser -Filter "Mail eq '$useremail'" -ErrorAction SilentlyContinue
+        if ($user) {
+            $ra = New-AzRoleAssignment -ObjectId $user.ObjectId -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
+        }
+    }
+
+    if ($ra) {
+        Write-Host "$useremail added as $customRole in Lab '$DevTestLabName'"
+    }
+    else {
+        Write-Host "Unable to add $useremail as $customRole in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
+    }
   }
 }
 
@@ -102,13 +137,13 @@ function Select-VmSettings {
 }
 
 function ManageExistingVM {
-  param($DevTestLabName, $VmSettings, $IfExist)
+  param($ResourceGroupName, $DevTestLabName, $VmSettings, $IfExist)
 
   $newSettings = @()
 
   $VmSettings | ForEach-Object {
     $vmName = $_.imageName
-    $existingVms = Get-AzResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -Name "*$DevTestLabName*" | Where-Object { $_.Name -eq "$DevTestLabName/$vmName"}
+    $existingVms = Get-AzResource -ResourceType "Microsoft.DevTestLab/labs/virtualMachines" -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -eq "$DevTestLabName/$vmName"}
 
     if($existingVms) {
       Write-Host "Found an existing VM $vmName in $DevTestLabName"
@@ -132,6 +167,122 @@ function ManageExistingVM {
   return $newSettings
 }
 
+function Wait-JobWithProgress {
+  param(
+    [ValidateNotNullOrEmpty()]
+    $jobs,
+
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    $secTimeout
+    )
+
+    Write-Host "Waiting for $(($jobs | Measure-Object).Count) job results at most $secTimeout seconds, or $( [math]::Round($secTimeout / 60,1)) minutes, or $( [math]::Round($secTimeout / 60 / 60,1)) hours ..."
+
+  if(-not $jobs) {
+    Write-Host "No jobs to wait for"
+    return
+  }
+
+  # Control how often we show output and print out time passed info
+  # Change here to make it go faster or slower
+  $RetryIntervalSec = 7
+  $MaxPrintInterval = 7
+  $PrintInterval = 1
+
+  $timer = [Diagnostics.Stopwatch]::StartNew()
+
+  $runningJobs = $jobs | Where-Object { $_ -and ($_.State -eq "Running") }
+  while(($runningJobs) -and ($timer.Elapsed.TotalSeconds -lt $secTimeout)) {
+
+    $output = $runningJobs | Receive-Job -Keep -ErrorAction Continue
+    # Only output something if we have something new to show
+    if ($output -and $output.ToString().Trim()) {
+      $output | Out-String | Write-Host
+    }
+
+    $runningJobs | Wait-Job -Timeout $RetryIntervalSec
+
+    if($PrintInterval -ge $MaxPrintInterval) {
+      $totalSecs = [math]::Round($timer.Elapsed.TotalSeconds,0)
+      Write-Host "Remaining running Jobs $(($runningJobs | Measure-Object).Count): Time Passed: $totalSecs seconds, or $( [math]::Round($totalSecs / 60,1)) minutes, or $( [math]::Round($totalSecs / 60 / 60,1)) hours ..." -ForegroundColor Yellow
+      $PrintInterval = 1
+    } else {
+      $PrintInterval += 1
+    }
+
+    $runningJobs = $jobs | Where-Object { $_ -and ($_.State -eq "Running") }
+  }
+
+  $timer.Stop()
+  $lasted = $timer.Elapsed.TotalSeconds
+
+  Write-Host ""
+  Write-Host "JOBS STATUS"
+  Write-Host "-------------------"
+  $jobs | Format-Table                            # Show overall status of all jobs
+  Write-Host ""
+  Write-Host "JOBS OUTPUT"
+  Write-Host "-------------------"
+  
+  $output = $jobs | Receive-Job -ErrorAction Continue
+
+  # If the output has resource types, format it like a table, otherwise just write it out
+  if ($output -and (Get-Member -InputObject $output[0] -Name ResourceType -MemberType Properties)) {
+    $output | Select-Object Name, `
+                            ResourceGroupName, `
+                            ResourceType, `
+                            @{Name="ProvisioningState";Expression={$_.Properties.provisioningState}}`
+            | Out-String | Write-Host
+  }
+  else {
+    $output | Out-String | Write-Host
+  }
+
+  $jobs | Remove-job -Force                       # -Force removes also the ones still running ...
+
+  if ($lasted -gt $secTimeout) {
+    throw "Jobs did not complete before timeout period. It lasted $lasted secs."
+  } else {
+    Write-Host "Jobs completed before timeout period. It lasted $lasted secs."
+  }
+}
+
+function Import-ConfigFile {
+  param
+  (
+    [parameter(ValueFromPipeline)]
+    [string] $ConfigFile = "config.csv"
+  )
+
+  $config = Import-Csv $ConfigFile
+
+  $config | ForEach-Object {
+    $lab = $_
+
+    # Confirm that the IpConfig is one of 3 options:
+    if ($lab.IpConfig -ne "Public" -and $lab.IpConfig -ne "Shared" -and $lab.Ipconfig -ne "Private") {
+        Write-Error "IpConfig either missing or incorrect for lab $($lab.DevTestLabName).  Must be 'Public', 'Private', or 'Shared'"
+    }
+
+    # Also add "Name" since that's used by the DTL Library for DevTestLabName
+    Add-Member -InputObject $lab -MemberType NoteProperty -Name "Name" -Value $lab.DevTestLabName
+
+    # We are getting a string from the csv file, so we need to split it
+    if($lab.LabOwners) {
+        $lab.LabOwners = $lab.LabOwners.Split(",").Trim()
+    } else {
+        $lab.LabOwners = @()
+    }
+    if($lab.LabUsers) {
+        $lab.LabUsers = $lab.LabUsers.Split(",").Trim()
+    } else {
+        $lab.LabUsers = @()
+    }
+
+    $lab
+  }
+}
 function Show-JobProgress {
   [CmdletBinding()]
   param(
@@ -160,69 +311,6 @@ function Show-JobProgress {
               Write-Progress @ProgressParams
           }
       }
-  }
-}
-
-function Wait-JobWithProgress {
-  param(
-    [ValidateNotNullOrEmpty()]
-    $jobs,
-
-    [Parameter(Mandatory)]
-    [ValidateNotNullOrEmpty()]
-    $secTimeout
-    )
-
-  Write-Host "Waiting for results at most $secTimeout seconds, or $( [math]::Round($secTimeout / 60,1)) minutes, or $( [math]::Round($secTimeout / 60 / 60,1)) hours ..."
-
-  if(-not $jobs) {
-    Write-Host "No jobs to wait for"
-    return
-  }
-
-  # Control how often we show output and print out time passed info
-  # Change here to make it go faster or slower
-  $RetryIntervalSec = 7
-  $MaxPrintInterval = 7
-  $PrintInterval = 1
-
-  $timer = [Diagnostics.Stopwatch]::StartNew()
-
-  $runningJobs = $jobs | Where-Object { $_ -and ($_.State -eq "Running") }
-  while(($runningJobs) -and ($timer.Elapsed.TotalSeconds -lt $secTimeout)) {
-
-    $runningJobs | Receive-job -Keep -ErrorAction Continue                # Show partial results
-    $runningJobs | Wait-Job -Timeout $RetryIntervalSec | Show-JobProgress # Show progress bar
-
-    if($PrintInterval -ge $MaxPrintInterval) {
-      $totalSecs = [math]::Round($timer.Elapsed.TotalSeconds,0)
-      Write-Host "Passed: $totalSecs seconds, or $( [math]::Round($totalSecs / 60,1)) minutes, or $( [math]::Round($totalSecs / 60 / 60,1)) hours ..." -ForegroundColor Yellow
-      $PrintInterval = 1
-    } else {
-      $PrintInterval += 1
-    }
-
-    $runningJobs = $jobs | Where-Object { $_ -and ($_.State -eq "Running") }
-  }
-
-  $timer.Stop()
-  $lasted = $timer.Elapsed.TotalSeconds
-
-  Write-Host ""
-  Write-Host "JOBS STATUS"
-  Write-Host "-------------------"
-  $jobs                                           # Show overall status of all jobs
-  Write-Host ""
-  Write-Host "JOBS OUTPUT"
-  Write-Host "-------------------"
-  $jobs | Receive-Job -ErrorAction Continue       # Show output for all jobs
-
-  $jobs | Remove-job -Force                       # -Force removes also the ones still running ...
-
-  if ($lasted -gt $secTimeout) {
-    throw "Jobs did not complete before timeout period. It lasted $lasted secs."
-  } else {
-    Write-Host "Jobs completed before timeout period. It lasted $lasted secs."
   }
 }
 
@@ -336,6 +424,7 @@ function Invoke-RSForEachLab {
       LabRegion='$($lab.LabRegion)';
       LabOwners= @($ownStr);
       LabUsers= @($userStr);
+      LabIpConfig='$($lab.IpConfig)';
       CustomRole='$($customRole)';
       ImagePattern='$($ImagePattern)';
       IfExist='$($IfExist)';
@@ -354,4 +443,98 @@ function Invoke-RSForEachLab {
   }
 
   Wait-RSJobWithProgress -secTimeout $secTimeout -jobs $jobs
+}
+
+function Get-RandomString {
+  param(
+    [Parameter(Mandatory)]
+    #Joining together a..z and A..Z we have exactly 52 characters to choose from
+    [ValidateRange(0, 52)]
+    [byte]$length
+  )
+  #Set ASCII boundaries for letter generation
+  $lowercaseA = 65
+  $lowercaseZ = 90
+  $uppercaseA = 97
+  $uppercaseZ = 122
+  return -join (($lowercaseA..$lowercaseZ) + ($uppercaseA..$uppercaseZ) `
+    | Get-Random -Count $length `
+    | ForEach-Object { [char]$_ })
+}
+
+# Generate password lifted from this location: https://blogs.technet.microsoft.com/heyscriptingguy/2015/11/05/generate-random-letters-with-powershell/
+Function Get-NewPassword() {
+    Param(
+        [int]$length=40
+    )
+    # NOTE: this excludes commas and some other special characters
+    return (-join ((48..57) + (65..90) + (97..122) | Get-Random -Count $length | % {[char]$_}))
+}
+
+function Split-Tags {
+  param
+  (
+    [Parameter(Mandatory)]
+    [psobject]$tags
+  )
+  $TAG_VALUE_MAX_LENGTH = 256
+  $MAX_TAG_PARTS_ALLOWED = 10
+  $tagFormatter = '"{0}":"{1}",'
+
+  $formattedTags = $tags | ForEach-Object {
+    # Azure max tag value length is 256. To circumvent this, a longer tag is splitted up
+    $tagValue = $_.Value.ToString()
+    $partsCounts = [int][Math]::Ceiling($tagValue.Length / $TAG_VALUE_MAX_LENGTH)
+    # Tag List to upload to the Image Version
+    $tagList = ""
+
+    #Extreme case : a tag longer than 2560 characters isn't allowed. 
+    # This can be easily extended by adding a new digit to the part numbering
+    # But that's just plain overkill at this point
+    if ($partsCounts -gt $MAX_TAG_PARTS_ALLOWED){
+      $maxCharactersAllowed = $MAX_TAG_PARTS_ALLOWED * $TAG_VALUE_MAX_LENGTH
+      throw "The tag $tagValue is longer than the max allowed tag length $maxCharactersAllowed character"
+    }
+    # Tag shorter than the limit, just add it to the list 
+    if ($partsCounts -le 1) {
+      $tagList = $tagFormatter -f $_.Name, $tagValue
+    }else{
+      #Tag longer than the limit, splitting it up into parts "key_$i : $PartialValue"
+      for ($i = 0; $i -lt $partsCounts; $i++) {
+        $partialKeyName = $_.Name + "_$i"
+        $cutIndex = $i * $TAG_VALUE_MAX_LENGTH
+        # Number of characters to cut
+        $chunkSize = [Math]::Min($TAG_VALUE_MAX_LENGTH, $tagValue.Length - $cutIndex)
+        $tagList += $tagFormatter -f $partialKeyName, $tagValue.Substring($cutIndex, $chunkSize) + "`n"
+      }
+    }
+    #Remove trailing newlines or spaces if any
+    $tagList.Trim()
+  } | Out-String
+  #Remove trailing comma
+  $formattedTags.Trim() -replace ".$"
+}
+
+function Join-Tags{
+  param
+  (
+    [Parameter(Mandatory)]
+    $tags
+  )
+  # Iterate on sorted "_X" properties parts, removing them while reassembling the property value
+  # The properties that weren't previously splitted are left untouched.
+  # Properties such as "YYY_0" and "YYY_1" will be reassembled as just "YYY", concatenating their values.
+  $numeralMatcher = "_\d+$"
+  $tags.PSobject.Properties.name -match $numeralMatcher | Sort-Object | ForEach-Object {
+    $propertyName = $_ -replace $numeralMatcher
+    # Create the property "YYY"
+    if (-not ($tags | Get-Member -Name "$propertyName")) {
+      $tags | Add-Member -MemberType "NoteProperty" -Name "$propertyName" -Value ""
+    }
+    # Concatenate the value of "YYY_X" to "YYY"
+    $tags.$propertyName += $tags.$_
+    # Remove the old "YYY_X" property
+    $tags.PSObject.Properties.Remove($_)
+  }
+  $tags
 }
