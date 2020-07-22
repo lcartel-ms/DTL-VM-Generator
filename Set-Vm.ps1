@@ -53,14 +53,47 @@ foreach($descr in $VmSettings) {
 
   Write-Host "Starting job to create a VM named $vmName"
 
-  $jobs += $lab | New-AzDtlVm -VmName $vmName `
-                              -Size $descr.size `
-                              -StorageType $descr.storageType `
-                              -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
-                              -Notes $descr.description `
-                              -OsType $descr.osType `
-                              -IpConfig $LabIpConfig `
-                              -AsJob
+  if ($descr.osType -ieq "Generalized") {
+
+    if ($descr.PSObject.Properties -imatch "SSHKey") {
+        # If we have a SSHKey, we know it's Linux and Generalized
+        $jobs += $lab | New-AzDtlVm -VmName $vmName `
+                                    -Size $descr.size `
+                                    -StorageType $descr.storageType `
+                                    -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
+                                    -Notes $descr.description `
+                                    -OsType $descr.osType `
+                                    -IpConfig $LabIpConfig `
+                                    -UserName $descr.Username `
+                                    -SshKey $descr.SSHKey `
+                                    -AsJob
+
+    }
+    else {
+        # If we have a password, we know it's windows or linux and generalized
+        $jobs += $lab | New-AzDtlVm -VmName $vmName `
+                                    -Size $descr.size `
+                                    -StorageType $descr.storageType `
+                                    -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
+                                    -Notes $descr.description `
+                                    -OsType $descr.osType `
+                                    -IpConfig $LabIpConfig `
+                                    -UserName $descr.Username `
+                                    -Password $descr.Password `
+                                    -AsJob
+    }
+  }
+  else {
+      # Must be specialized custom image
+      $jobs += $lab | New-AzDtlVm -VmName $vmName `
+                                  -Size $descr.size `
+                                  -StorageType $descr.storageType `
+                                  -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
+                                  -Notes $descr.description `
+                                  -OsType $descr.osType `
+                                  -IpConfig $LabIpConfig `
+                                  -AsJob
+  }
 
   Start-Sleep -Seconds 60
 }

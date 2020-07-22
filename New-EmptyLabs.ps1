@@ -41,6 +41,22 @@ $labCreateJobs = $config | ForEach-Object {
                            }
 Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
 
+# Update the shutdown policy on the labs
+Write-Host "---------------------------------" -ForegroundColor Green
+Write-Host "Updating $configCount labs with correct shutdown policy..." -ForegroundColor Green
+Wait-JobWithProgress -jobs ($config | Set-AzDtlLabShutdown -AsJob) -secTimeout 300
+
+# Add in Shared Image Gallery to the labs
+Write-Host "---------------------------------" -ForegroundColor Green
+Write-Host "Connecting Shared Image Gallery to  $configCount labs ..." -ForegroundColor Green
+$config | ForEach-Object {
+    $SharedImageGallery = Get-AzGallery -Name $_.SharedImageGalleryName
+    if (-not $SharedImageGallery) {
+        Throw "Unable to update lab '$($_.Name)', '$($_.SharedImageGalleryName)' shared image gallery does not exist."
+    }
+    $_ | Get-AzDtlLab | Set-AzDtlLabSharedImageGallery -Name $_.SharedImageGalleryName -ResourceId $SharedImageGallery.Id
+}
+
 # Update the IP Policy on the labs
 Write-Host "---------------------------------" -ForegroundColor Green
 Write-Host "Updating $configCount labs with IP Policy ..." -ForegroundColor Green

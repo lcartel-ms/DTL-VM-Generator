@@ -685,7 +685,6 @@ function Add-AzDtlLabTags {
                 }
                 return
             }
-
             function Unify-Tags {
                 [CmdletBinding()]
                 param(
@@ -1150,7 +1149,6 @@ function Set-AzDtlLabSharedImageGalleryImages  {
             }
 
             UpdateSharedImageGalleryImage $SharedImageGallery.ResourceId $ImageName $OsType $ImageType $status
-
         } else {
             # First ensure the Images property is correctly set
             if ($SharedImageGallery.Images) {
@@ -1158,7 +1156,6 @@ function Set-AzDtlLabSharedImageGalleryImages  {
                 foreach ($img in $SharedImageGallery.Images) {
                     UpdateSharedImageGalleryImage $SharedImageGallery.ResourceId $img.definitionName $img.osType $img.imageType $img.enableState
                 }
-
             } else {
                 Write-Error '$SharedImageGallery.Images property must be set or ImageName & Enabled must be set'
             }
@@ -1383,7 +1380,6 @@ function Stop-AzDtlVm {
             Enable-AzContextAutosave -Scope Process | Out-Null
             $rg = Get-AzResourceGroup | Out-Null
             $Mutex.ReleaseMutex() | Out-Null
-
           }
 
           Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "stop" -Force | Out-Null
@@ -2263,7 +2259,6 @@ function Set-AzDtlVmArtifact {
                 Enable-AzContextAutosave -Scope Process | Out-Null
                 $rg = Get-AzResourceGroup | Out-Null
                 $Mutex.ReleaseMutex() | Out-Null
-
             }
 
             $ResourceGroupName = $v.ResourceGroupName
@@ -2565,7 +2560,6 @@ function New-AzDtlVm {
         $p | Add-Member -Name 'size' -Value $Size -MemberType NoteProperty
 
         if($StorageType) {$p | Add-Member -Name 'storageType' -Value $StorageType -MemberType NoteProperty}
-
         if($Notes) {$p | Add-Member -Name 'notes' -Value $Notes -MemberType NoteProperty}
 
         if($Claimable) {$p | Add-Member -Name 'allowClaim' -Value $True -MemberType NoteProperty}
@@ -2659,7 +2653,6 @@ function New-AzDtlVm {
                     $SigImageName = $SigImageString.Split("/") | Select -Last 1
                     $SigGalleryName = $SigImageString.Split("/") | Select -Last 2 | Select -First 1
                 }
-
             }
 
             $SubscriptionID = (Get-AzureRmContext).Subscription.Id
@@ -2846,7 +2839,6 @@ function New-AzDtlLabEnvironment{
         $UserId = $((Get-AzureRmADUser -UserPrincipalName (Get-AzureRmContext).Account).Id.Guid)
         if (-not $UserId) {throw "Unable to get User Id."}
       }
-
       # Get the DevTest lab internal repository identifier
       $repository = Get-AzureRmResource -ResourceGroupName $Lab.ResourceGroupName `
         -ResourceType 'Microsoft.DevTestLab/labs/artifactsources' `
@@ -2854,7 +2846,6 @@ function New-AzDtlLabEnvironment{
         -ApiVersion 2016-05-15 `
         | Where-Object { $ArtifactRepositoryDisplayName -in ($_.Name, $_.Properties.displayName) } `
         | Select-Object -First 1
-
       if (-not $repository) { throw "Unable to find repository $ArtifactRepositoryDisplayName in lab $($Lab.Name)." }
 
       # Get the internal environment template name
@@ -3621,7 +3612,6 @@ function BuildVmSizeThresholdString {
     # Process the incoming allowed sizes, need to convert to the special string
     $thresholdString = ($vmSizes | ForEach-Object {
         $finalSize = $_
-
         # Add starting & ending string if missing
         if (-not $_.StartsWith('"')) {
             $finalSize = '"' + $finalSize
@@ -3751,7 +3741,6 @@ function Get-AzDtlLabAllowedVmSizePolicy {
             } else {
                 $sizes = $null
             }
-
             [pscustomobject] @{
                 Status = $policy.Properties.Status
                 AllowedSizes = $sizes

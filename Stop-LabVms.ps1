@@ -16,6 +16,9 @@ $ErrorActionPreference = "Stop"
 . "./Utils.ps1"                                          # Import all our utilities
 Import-AzDtlModule                                       # Import the DTL Library
 
+Write-Host "Stopping VMs in $DevTestLabName in RG $ResourceGroupName ..."
+Write-Host "This might take a while ..."
+
 $existingLab = Get-AzDtlLab -Name $DevTestLabName -ResourceGroupName $ResourceGroupName
 
 if (-not $existingLab) {
@@ -31,7 +34,7 @@ if ($VmSettings) {
 }
 
 if (-not $runningVms) {
-  Write-Output "'$DevTestLabName' doesn't contain any running VMs"
+  Write-Host "'$DevTestLabName' doesn't contain any running VMs"
   return
 }
 
@@ -40,7 +43,6 @@ Write-Output "This might take a while ..."
 
 $jobs = @()
 $runningVms | ForEach-Object {
-
   $sb = {
     # Workaround for https://github.com/Azure/azure-powershell/issues/9448
     $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
