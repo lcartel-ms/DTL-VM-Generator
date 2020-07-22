@@ -26,12 +26,6 @@ param
 if ($LabBastionEnabled) {
     $ErrorActionPreference = "Stop"
 
-    # Workaround for https://github.com/Azure/azure-powershell/issues/9448
-    $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-    $Mutex.WaitOne() | Out-Null
-    $rg = Get-AzResourceGroup | Out-Null
-    $Mutex.ReleaseMutex() | Out-Null
-
     # Common setup for scripts
     . "./Utils.ps1"                                          # Import all our utilities
     Import-AzDtlModule   

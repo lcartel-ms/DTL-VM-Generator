@@ -3,7 +3,13 @@
 This script will import VHDs an JSON files into a Shared Image Gallery
 
 .EXAMPLE
-./Import-VHDsToSharedImageGallery.ps1 https://mystorageaccount.blob.core.windows.net/vhds-12-2019 
+.\Import-VHDsToSharedImageGallery.ps1 -StorageAccountName "" `
+                                      -StorageAccountResourceGroup "" `
+                                      -StorageContainerName "" `
+                                      -SharedImageGalleryResourceGroupName "" `
+                                      -SharedImageGalleryName "" `
+                                      -SharedImageGalleryLocation
+
 #>
 
 #Requires -Version 3.0
@@ -38,12 +44,6 @@ param
 )
 $startTime = Get-Date
 
-# Workaround for https://github.com/Azure/azure-powershell/issues/9448
-$Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-$Mutex.WaitOne() | Out-Null
-$rg = Get-AzResourceGroup | Out-Null
-$Mutex.ReleaseMutex() | Out-Null
-
 Write-Output "Start of script: $StartTime"
 
 $ErrorActionPreference = 'Stop'
@@ -73,11 +73,6 @@ $importVhdToSharedImageGalleryScriptBlock = {
         [Parameter(Mandatory=$true, HelpMessage="The tags describing the image version")]
         [psobject] $tagDetails
     )
-    # Workaround for https://github.com/Azure/azure-powershell/issues/9448
-    $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-    $Mutex.WaitOne() | Out-Null
-    $rg = Get-AzResourceGroup | Out-Null
-    $Mutex.ReleaseMutex() | Out-Null
 
     # See if we have an existing image
     $imageDef = $ImageDefinitions | Where-Object {$_.Name -eq $imageInfo.imageName}
