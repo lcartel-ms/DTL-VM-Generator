@@ -24,8 +24,9 @@ Test-*
 credentials.csv
 
 #Exclude DTL module
+# WORKAORUND: so we can modify the library to work around this issue:
+# https://github.com/Azure/azure-powershell/issues/9448
 # Az.DevTestLabs2.psm1
-Az.DevTestLabs2.psm1
 
 #Exclude any key pair
 sample_key*

@@ -10,19 +10,38 @@ $ErrorActionPreference = "Stop"
 # Common setup for scripts
 . "./Utils.ps1"                                          # Import all our utilities
 Import-AzDtlModule                                       # Import the DTL Library
-$config = Import-ConfigFile -ConfigFile $ConfigFile      # Import all the lab settings from the config file
+$labConfig = Import-ConfigFile -ConfigFile $ConfigFile   # Import all the lab settings from the config file
+$labConfigCount = ($labConfig | Measure-Object).Count
 
-Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Removing the following $(($config | Measure-Object).Count) labs from Azure..." -ForegroundColor Green
+$bastionLabConfig = [Array] ($labConfig | Where-Object { $_.BastionEnabled })
+$bastionLabConfigCount = ($bastionLabConfig | Measure-Object).Count
 
-$config | Select-Object DevTestLabName, ResourceGroupName | Format-Table | Out-String | Write-Host
-
-$jobs = $config | Get-AzDtlLab | Remove-AzDtlLab -AsJob
-
-if ($jobs) {
-    Wait-JobWithProgress -jobs $jobs -secTimeout 1200
+if ($bastionLabConfigCount -gt 0) {
+    Write-Host "---------------------------------" -ForegroundColor Green
+    Write-Host "Removing Bastion hosts from the following $bastionLabConfigCount labs..." -ForegroundColor Green
+    $labConfig | Select-Object DevTestLabName, ResourceGroupName, BastionEnabled | Format-Table | Out-String | Write-Host
+    
+    $bastionRemoveJobs = $bastionLabConfig | Get-AzDtlLab | Remove-AzDtlBastion -AsJob
+    if ($bastionRemoveJobs) {
+        Wait-JobWithProgress -jobs $bastionRemoveJobs -secTimeout 1800
+    }
+    
+    Write-Host "Completed removing Bastion hosts from Labs!" -ForegroundColor Green
 }
 
-Write-Host "Completed removing labs!" -ForegroundColor Green
+if ($labConfigCount -gt 0) {
+    Write-Host "---------------------------------" -ForegroundColor Green
+    Write-Host "Removing the following $labConfigCount labs from Azure..." -ForegroundColor Green
+    $labConfig | Select-Object DevTestLabName, ResourceGroupName | Format-Table | Out-String | Write-Host
+
+    $labRemoveJobs = $labConfig | Get-AzDtlLab | Remove-AzDtlLab -AsJob
+
+    # Special case, if the labs no longer exist, we don't get jobs back, so we can skip this
+    if ($labRemoveJobs) {
+        Wait-JobWithProgress -jobs $labRemoveJobs -secTimeout 3600
+    }
+
+    Write-Host "Completed removing labs!" -ForegroundColor Green
+}
 
 Remove-AzDtlModule                                       # Remove the DTL Library

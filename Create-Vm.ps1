@@ -58,7 +58,8 @@ if(-not $toCreate) {
 
 Write-Host "Creating ... $toCreate"
 
-& "./Set-Vm.ps1" -VmSettings $toCreate -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -LabIpConfig $LabIpConfig -SharedImageGalleryName $SharedImageGalleryName -IfExist $IfExist
-& "./Set-Network.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VMsToConfigure $selected -VmSettings $VmSettings
+& "./Set-Vm.ps1" -VmSettings $toCreate -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -SharedImageGalleryName $SharedImageGalleryName  -LabIpConfig $LabIpConfig -IfExist $IfExist
+& "./Set-Network.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VMsToConfigure $toCreate -VmSettings $VmSettings -LabIpConfig $LabIpConfig
+& "./Stop-LabVms.ps1" -DevTestLabName $DevTestLabName -ResourceGroupName $ResourceGroupName -VmSettings $selected
 
 return "Creation seemed to have worked fine for $DevTestLabName"
