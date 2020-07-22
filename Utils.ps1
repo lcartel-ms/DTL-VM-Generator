@@ -457,7 +457,7 @@ function Select-VmSettings {
   param (
     $sourceImageInfos,
 
-    [Parameter(HelpMessage="String containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
+    [Parameter(HelpMessage="Example:  'ID-*,CSW2-SRV' , a string containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
     [string] $ImagePattern = ""
   )
 
@@ -483,6 +483,37 @@ function Select-VmSettings {
   }
 
   return $sourceImageInfos
+}
+
+function Select-Vms {
+  param (
+    $vms,
+
+    [Parameter(HelpMessage="Example:  'ID-*,CSW2-SRV' , a string containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
+    [string] $ImagePattern = ""
+  )
+
+  if($ImagePattern) {
+    $patterns = $ImagePattern.Split(",").Trim()
+
+    # Severely in need of a linq query to do this ...
+    $newVms = @()
+    foreach($vm in $vms) {
+      foreach($cond in $patterns) {
+        if($vm.Name -like $cond) {
+          $newVms += $vm
+          break
+        }
+      }
+    }
+    if(-not $newVms) {
+      throw "No vm selected by the ImagePattern chosen in $DevTestLabName"
+    }
+
+    return $newVms
+  }
+
+  return $vms # No ImagePattern passed
 }
 
 function ManageExistingVM {

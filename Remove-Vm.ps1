@@ -6,12 +6,8 @@ param
   [Parameter(Mandatory=$true, HelpMessage="RG of lab to remove")]
   [string] $ResourceGroupName,
 
-  [Parameter(Mandatory=$false, HelpMessage="ImagePattern of VM to remove")]
-  [string] $ImagePattern = "Windows - Lab",
-
-  [ValidateSet("Note","Name")]
-  [Parameter(Mandatory=$true, HelpMessage="Property of the VM to match by (Name, Note)")]
-  [string] $MatchBy,
+  [Parameter(HelpMessage="Example: 'ID-*,CSW2-SRV' , a string containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
+  [string] $ImagePattern = "",
 
   [Parameter(valueFromRemainingArguments=$true)]
   [String[]]
@@ -21,33 +17,6 @@ param
 $ErrorActionPreference = "Stop"
 
 . "./Utils.ps1"
-
-function Select-Vms {
-  param ($vms)
-
-  if($ImagePattern) {
-    $patterns = $ImagePattern.Split(",").Trim()
-
-    # Severely in need of a linq query to do this ...
-    $newVms = @()
-    foreach($vm in $vms) {
-      foreach($cond in $patterns) {
-        $toCompare = if($MatchBy -eq "Note") {$vm.Properties.notes} else {$vm.Name}
-        if($toCompare -like $cond) {
-          $newVms += $vm
-          break
-        }
-      }
-    }
-    if(-not $newVms) {
-      throw "No vm selected by the ImagePattern chosen in $DevTestLabName"
-    }
-
-    return $newVms
-  }
-
-  return $vms # No ImagePattern passed
-}
 
 $existingLab = Get-AzDtlLab -Name $DevTestLabName -ResourceGroupName $ResourceGroupName
 
