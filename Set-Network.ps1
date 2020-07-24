@@ -6,9 +6,6 @@ param
     [Parameter(Mandatory=$true, HelpMessage="The Name of the resource group to create the lab in")]
     [string] $ResourceGroupName,
 
-    [Parameter(Mandatory=$false, HelpMessage="The VMs we're adjusting the network settings")]
-    $VMsToConfigure = "",
-
     [Parameter(Mandatory=$false, HelpMessage="The VM Configuration objects (by default it downloads them)")]
     $VmSettings = "",
 
@@ -28,13 +25,6 @@ if(-not $VmSettings) {
 if(-not $VmSettings) {
   throw "VmSettings can't be null or empty"
 }
-
-if (-not $VMsToConfigure) {
-  # If $VMsToConfigure is empty, we assume we're updating all VMs
-  $VMsToConfigure = $VmSettings
-}
-
-$VMsToConfigureNames = $VMsToConfigure | Select -ExpandProperty imagename
 
 $scriptFolder = $PWD
 
@@ -102,7 +92,7 @@ if($nicsHash.count -eq 0) {
 }
 
 # Act on each NIC depending if it's a dns server or not
-$nicsHash.Keys | Where-Object {$VMsToConfigureNames -contains $_} | ForEach-Object {
+$nicsHash.Keys | ForEach-Object {
   $value = $nicsHash[$_]
   $isDns = -not $value.dnsServer
   $nic = $value.nic

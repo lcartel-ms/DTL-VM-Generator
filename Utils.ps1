@@ -90,11 +90,6 @@ function Import-PsipcalcScript {
 function Remove-PsipcalcScript {
   Remove-Item -Path $PSipcalcScriptPath
 }
-
-function Remove-AzDtlModule {
-  Remove-Module -Name "Az.DevTesTLabs2" -ErrorAction SilentlyContinue
-}
-
 function Set-LabAccessControl {
   param(
     $DevTestLabName,
