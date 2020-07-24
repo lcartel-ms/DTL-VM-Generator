@@ -91,6 +91,8 @@ foreach($descr in $VmSettings) {
                                   -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
                                   -Notes $descr.description `
                                   -OsType $descr.osType `
+                                  -UserName "phauge" `
+                                  -Password "123Secret!!123" `
                                   -IpConfig $LabIpConfig `
                                   -AsJob
   }

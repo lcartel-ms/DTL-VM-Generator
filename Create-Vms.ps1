@@ -11,8 +11,8 @@ param
     [string] $ImagePattern = "",
 
     [ValidateSet("Delete","Leave","Error")]
-    [Parameter(Mandatory=$true, HelpMessage="What to do if a VM with the same name exist in the lab (Delete, Leave, Error)")]
-    [string] $IfExist,
+    [Parameter(HelpMessage="What to do if a VM with the same name exist in the lab (Delete, Leave, Error)")]
+    [string] $IfExist = "Leave",
 
     [Parameter(Mandatory=$false, HelpMessage="Once the VMs are created, apply Windows Updates?")]
     [bool] $ApplyWindowsUpdates = $false

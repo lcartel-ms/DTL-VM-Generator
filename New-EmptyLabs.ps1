@@ -73,11 +73,6 @@ if (($configBastion | Measure-Object).Count -gt 0) {
     "./Deploy-Bastion.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -SecTimeout (8 * 60 * 60) -CustomRole $null -ModulesToImport $AzDtlModulePath
 }
 
-# Update the shutdown policy on the labs
-Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Updating $configCount labs with correct shutdown policy..." -ForegroundColor Green
-Wait-JobWithProgress -jobs ($config | Set-AzDtlLabShutdown -AsJob) -secTimeout 300
-
 # Add appropriate owner/user permissions for the labs
 Write-Host "---------------------------------" -ForegroundColor Green
 Write-Host "Adding owners & users for $configCount labs..." -ForegroundColor Green
