@@ -4,7 +4,7 @@
     [ValidateNotNullOrEmpty()]
     [string] $ConfigFile = "config.csv",
 
-    [Parameter(HelpMessage="String containing comma delimitated list of patterns. The script will apply updates to just the VMs matching one of the patterns.")]
+    [Parameter(HelpMessage="Example: 'ID-*,CSW2-SRV' , a string containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
     [string] $ImagePattern = "",
 
     [Parameter(Mandatory=$false, HelpMessage="Shutdown the VMs when done?")]
@@ -29,16 +29,7 @@ $config | ForEach-Object {
     $vms = Get-AzDtlVm -Lab @{Name = $_.DevTestLabName; ResourceGroupName = $_.ResourceGroupName}
     
     # Trim down the list of VMs based on the image pattern passed in...
-    if ($ImagePattern) {
-        $vms = $vms | Where-Object {
-            $name = $_.Name
-            $ImagePattern.Split(",").Trim() | ForEach-Object {
-                if ($name -like $_) {
-                    $true
-                }
-            }
-        }
-    }
+    $vms = Select-Vms -vms $vms -ImagePattern $ImagePattern
 
     Write-Host "Status of VMs before doing any operations..."
     $vms | Select-Object `

@@ -7,7 +7,7 @@ param
     [Parameter(Mandatory=$false, HelpMessage="How many minutes to wait before starting the next parallel lab creation")]
     [int] $SecondsBetweenLoop =  10,
 
-    [Parameter(HelpMessage="String containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
+    [Parameter(HelpMessage="Example: 'ID-*,CSW2-SRV' , a string containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
     [string] $ImagePattern = "",
 
     [ValidateSet("Delete","Leave","Error")]
@@ -23,7 +23,6 @@ $ErrorActionPreference = "Stop"
 # Common setup for scripts
 . "./Utils.ps1"                                          # Import all our utilities
 Import-AzDtlModule                                       # Import the DTL Library
-$config = Import-ConfigFile -ConfigFile $ConfigFile      # Import all the lab settings from the config file
 
 Write-Host "---------------------------------" -ForegroundColor Green
 Write-Host "Creating VMs..." -ForegroundColor Green
