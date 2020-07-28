@@ -778,7 +778,7 @@ function Add-AzDtlLabTags {
 
             # Check to see if the resource already has all the tags
             $newTags = (Unify-Tags $Resource.Tags $tags)
-            if (Compare-Hashtable -Left $Resource.Tags -Right $newTags) {
+            if ((-not $resource.Tags) -or (Compare-Hashtable -Left $Resource.Tags -Right $newTags)) {
 
                 if($AsJob) {
                     Start-Job      -ScriptBlock $tagSb -ArgumentList $Resource, $IsResourceGroup, $newTags, $justAz
