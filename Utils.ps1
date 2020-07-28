@@ -762,7 +762,6 @@ function Invoke-RSForEachLab {
     [string] $ImagePattern = "",
     [string] $IfExist = "Leave",
     [int] $SecTimeout = 5 * 60 * 60,
-    [string] $MatchBy = "",
     [string[]] $ModulesToImport
   )
 
@@ -819,8 +818,7 @@ function Invoke-RSForEachLab {
       LabBastionEnabled=`$$($lab.BastionEnabled);
       CustomRole='$($customRole)';
       ImagePattern='$($ImagePattern)';
-      IfExist='$($IfExist)';
-      MatchBy='$($MatchBy)'
+      IfExist='$($IfExist)'
     }"
 
     $sb = [scriptblock]::create(

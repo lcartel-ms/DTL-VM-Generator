@@ -58,40 +58,40 @@ $VmSettings | ForEach-Object {
 
   # Find the VM
   $vm = $vms | Where-Object {$_.Name -eq $vmName}
-  if(-not $vm) {
-    throw "Can't find VM named $vmName in lab $DevTestLabName in RG $ResourceGroupName"
-  }
 
-  # DANGER: this is implementation specific. Might change if DTL Changes how it stores compute info.
-  $computeVm = Get-AzResource -ResourceId $vm.Properties.computeId
-  $computeGroup = $computeVm.ResourceGroupName
+  # We only proceed if we've found the VM
+  if($vm) {
+      # DANGER: this is implementation specific. Might change if DTL Changes how it stores compute info.
+      $computeVm = Get-AzResource -ResourceId $vm.Properties.computeId
+      $computeGroup = $computeVm.ResourceGroupName
 
-  $nic = Get-AzNetworkInterface -Name $vmName -ResourceGroupName $computeGroup
-  if(-not $nic) {
-    throw "Can't find the NIC named $vmName in the compute group $computeGroup"
-  }
-  Write-Host "Found the NIC for $vmName ..."
-
-  # Clear any existing DNS settings, in case this is the 2nd+ time through this script
-  # since we reset them all anyway, for all the VMs in the lab
-  if ($nic.DnsSettings.DnsServers.Count -gt 0) {
-    $nic.DnsSettings.DnsServers.Clear()
-  }
-
-  $ip = $nic.IpConfigurations | ForEach-Object {$_.PrivateIpAddress}
-
-  # Add the network details for all the VMs into the list
-  $nicsHash.add($vmName, @{'nic' = $nic; 'dnsServer' = $dnsServer;'ip' = $ip})
-
-  # Handle Shared IPs based on VM Size since that's how DTL groups them into availability sets
-  if ($LabIpConfig -eq "Shared") {
-      if ($nicsHashBySize.Keys | Where-Object {$vm.Properties.size -eq $_}) {
-        $nicsHashBySize[$vm.Properties.size].Add(@{'nic' = $nic; 'dnsServer' = $dnsServer;'ip' = $ip})
+      $nic = Get-AzNetworkInterface -Name $vmName -ResourceGroupName $computeGroup
+      if(-not $nic) {
+        throw "Can't find the NIC named $vmName in the compute group $computeGroup"
       }
-      else {
-        $list = New-Object System.Collections.ArrayList
-        $list.Add(@{'nic' = $nic; 'dnsServer' = $dnsServer;'ip' = $ip})
-        $nicsHashBySize.Add($vm.Properties.size, $list)
+      Write-Host "Found the NIC for $vmName ..."
+
+      # Clear any existing DNS settings, in case this is the 2nd+ time through this script
+      # since we reset them all anyway, for all the VMs in the lab
+      if ($nic.DnsSettings.DnsServers.Count -gt 0) {
+        $nic.DnsSettings.DnsServers.Clear()
+      }
+
+      $ip = $nic.IpConfigurations | ForEach-Object {$_.PrivateIpAddress}
+
+      # Add the network details for all the VMs into the list
+      $nicsHash.add($vmName, @{'nic' = $nic; 'dnsServer' = $dnsServer;'ip' = $ip})
+
+      # Handle Shared IPs based on VM Size since that's how DTL groups them into availability sets
+      if ($LabIpConfig -eq "Shared") {
+          if ($nicsHashBySize.Keys | Where-Object {$vm.Properties.size -eq $_}) {
+            $nicsHashBySize[$vm.Properties.size].Add(@{'nic' = $nic; 'dnsServer' = $dnsServer;'ip' = $ip})
+          }
+          else {
+            $list = New-Object System.Collections.ArrayList
+            $list.Add(@{'nic' = $nic; 'dnsServer' = $dnsServer;'ip' = $ip})
+            $nicsHashBySize.Add($vm.Properties.size, $list)
+          }
       }
   }
 

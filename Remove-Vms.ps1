@@ -6,12 +6,8 @@ param
     [Parameter(Mandatory=$false, HelpMessage="How many Seconds to wait before starting the next parallel vm deletion")]
     [int] $SecondsToNextVmDeletion =  10,
 
-    [Parameter(Mandatory=$false, HelpMessage="Pattern of VM to remove")]
-    [string] $Pattern = "Windows - Lab",
-
-    [ValidateSet("Note","Name")]
-    [Parameter(Mandatory=$true, HelpMessage="Property of the VM to match by (Name, Note)")]
-    [string] $MatchBy
+    [Parameter(HelpMessage="Example: 'ID-*,CSW2-SRV' , a string containing comma delimitated list of patterns. The script will (re)create just the VMs matching one of the patterns. The empty string (default) recreates all labs as well.")]
+    [string] $ImagePattern = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,4 +16,4 @@ $ErrorActionPreference = "Stop"
 
 Import-AzDtlModule
 
-"./Remove-Vm.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop 2  -SecTimeout (1 * 60 * 60) -ImagePattern $Pattern -MatchBy $MatchBy -ModulesToImport $AzDtlModulePath
+"./Remove-Vm.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop 2  -SecTimeout (1 * 60 * 60) -ImagePattern $ImagePattern -ModulesToImport $AzDtlModulePath
