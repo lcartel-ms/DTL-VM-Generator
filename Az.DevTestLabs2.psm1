@@ -3972,35 +3972,42 @@ function Import-AzDtlCustomImageFromUri {
           $DestStorageContext = New-AzureStorageContext -StorageAccountName $DestStorageAcctName -StorageAccountKey $DestStorageAcctKey
           New-AzureStorageContainer -Context $DestStorageContext -Name 'uploads' -EA SilentlyContinue
 
-          # Copy vhd at uri to storage account
-          # TODO: it probably uses one more thread than needed.
-          $handle = Start-AzureStorageBlobCopy -srcUri $Uri -DestContainer 'uploads' -DestBlob $ImageName -DestContext $DestStorageContext -Force
-          Write-Verbose "Started copying $ImageName from $Uri ..."
-          $copyStatus = $handle | Get-AzureStorageBlobCopyState
+          # Determine if the file is *already* in the lab's storage account in the right place
+          # Only copy if it isn't already present
+          $vhdFIlename = $Uri.Split('/') | Select -Last 1
+          $destUri = $DestStorageContext.BlobEndPoint + "uploads/" + $vhdFIlename
+          if ($destUri -ine $Uri) {
 
-          while (($copyStatus | Where-Object {$_.Status -eq "Pending"}) -ne $null) {
-              $copyStatus | Where-Object {$_.Status -eq "Pending"} | ForEach-Object {
-                  [int]$perComplete = ($_.BytesCopied/$_.TotalBytes)*100
-                  Write-Verbose ("    Copying " + $($_.Source.Segments[$_.Source.Segments.Count - 1]) + " to " + $DestStorageAcctName + " - $perComplete% complete" )
-              }
-              Start-Sleep -Seconds 60
+              # Copy vhd at uri to storage account
+              # TODO: it probably uses one more thread than needed.
+              $handle = Start-AzureStorageBlobCopy -srcUri $Uri -DestContainer 'uploads' -DestBlob $vhdFIlename -DestContext $DestStorageContext -Force
+              Write-Verbose "Started copying $ImageName from $Uri ..."
               $copyStatus = $handle | Get-AzureStorageBlobCopyState
-          }
 
-          $copyStatus | Where-Object {$_.Status -ne "Success"} | ForEach-Object {
-            throw "    Error copying image $($_.Source.Segments[$_.Source.Segments.Count - 1]), $($_.StatusDescription)."
-          }
+              while (($copyStatus | Where-Object {$_.Status -eq "Pending"}) -ne $null) {
+                  $copyStatus | Where-Object {$_.Status -eq "Pending"} | ForEach-Object {
+                      [int]$perComplete = ($_.BytesCopied/$_.TotalBytes)*100
+                      Write-Verbose ("    Copying " + $($_.Source.Segments[$_.Source.Segments.Count - 1]) + " to " + $DestStorageAcctName + " - $perComplete% complete" )
+                  }
+                  Start-Sleep -Seconds 60
+                  $copyStatus = $handle | Get-AzureStorageBlobCopyState
+              }
 
-          $copyStatus | Where-Object {$_.Status -eq "Success"} | ForEach-Object {
-            Write-Verbose "    Completed copying image $($_.Source.Segments[$_.Source.Segments.Count - 1]) to $DestStorageAcctName - 100% complete"
+              $copyStatus | Where-Object {$_.Status -ne "Success"} | ForEach-Object {
+                throw "    Error copying image $($_.Source.Segments[$_.Source.Segments.Count - 1]), $($_.StatusDescription)."
+              }
+
+              $copyStatus | Where-Object {$_.Status -eq "Success"} | ForEach-Object {
+                Write-Verbose "    Completed copying image $($_.Source.Segments[$_.Source.Segments.Count - 1]) to $DestStorageAcctName - 100% complete"
+              }
           }
 
           # Create custom images
           $params = @{
             existingLabName = $l.Name
-            existingVhdUri = $DestStorageContext.BlobEndPoint + "uploads/" + $ImageName
+            existingVhdUri = $destUri
             imageOsType = $ImageOsType
-            isVhdSysPrepped = $IsVhdSysPrepped
+            isVhdSysPrepped = [boolean] $IsVhdSysPrepped
             imageName = $ImageName
             imageDescription = $ImageDescription
           }
