@@ -49,7 +49,10 @@ function Import-RemoteModule {
   # $WebClient = New-Object System.Net.WebClient
   # $WebClient.DownloadFile($Source, $modulePath)
 
-  Import-Module $modulePath -Force
+  # Only import the module if it isn't already imported
+  if (-not (Get-Module -Name Az.DevTestLabs2)) {
+    Import-Module $modulePath -Force
+  }
 }
 
 function Import-RemoteScript {

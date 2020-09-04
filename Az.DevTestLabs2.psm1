@@ -58,9 +58,9 @@ $MyInvocation.MyCommand.ScriptBlock.Module.OnRemove = {
 function BeginPreamble {
   [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseDeclaredVarsMoreThanAssignments", "", Scope="Function")]
   param()
-  Get-CallerPreference -Cmdlet $PSCmdlet -SessionState $ExecutionContext.SessionState
-  $callerEA = $ErrorActionPreference
-  $ErrorActionPreference = 'Stop'
+    Get-CallerPreference -Cmdlet $PSCmdlet -SessionState $ExecutionContext.SessionState -Name ("ErrorActionPreference")
+    $callerEA = $ErrorActionPreference
+    $ErrorActionPreference = 'Stop'
 }
 
 function PrintHashtable {
@@ -220,10 +220,10 @@ function DeployLab {
   }
 
   if ($Name.Length -gt 40) {
-    $deploymentName = "LabDeploy_" + $Name.Substring(0, 40)
+    $deploymentName = ("LabDeploy_" + $Name.Substring(0, 40))
   }
   else {
-      $deploymentName = "LabDeploy" + $Name
+      $deploymentName = ("LabDeploy" + $Name)
   }
   Write-Verbose "Using deployment name $deploymentName with params`n $(PrintHashtable $Parameters)"
 
@@ -251,7 +251,9 @@ function DeployLab {
     }
 
     # Import again the module
-    Import-Module "$workingDir\Az.DevTestLabs2.psm1"
+    if (-not (Get-Module -Name Az.DevTestLabs2)) {
+        Import-Module "$workingDir\Az.DevTestLabs2.psm1"
+    }
 
     $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -TemplateParameterObject $Parameters
     Write-debug "Deployment succeded with deployment of `n$deployment"
@@ -1892,7 +1894,9 @@ function New-AzDtlBastion {
         }
 
         # Import again the module
-        Import-Module "$workingDir\Az.DevTestLabs2.psm1"
+        if (-not (Get-Module -Name Az.DevTestLabs2)) {
+          Import-Module "$workingDir\Az.DevTestLabs2.psm1"
+        }
 
         # Get again the lab just in case the preview API was not used
         $Lab = $Lab | Get-AzDtlLab
@@ -2079,7 +2083,9 @@ function Remove-AzDtlBastion {
         }
 
         # Import again the module
-        Import-Module "$workingDir\Az.DevTestLabs2.psm1"
+        if (-not (Get-Module -Name Az.DevTestLabs2)) {
+          Import-Module "$workingDir\Az.DevTestLabs2.psm1"
+        }
 
         $Lab = $Lab | Get-AzDtlLab
         $bastion = $Lab | Get-AzDtlBastion -LabVirtualNetworkId $LabVirtualNetworkId
@@ -4007,7 +4013,7 @@ function Import-AzDtlCustomImageFromUri {
             existingLabName = $l.Name
             existingVhdUri = $destUri
             imageOsType = $ImageOsType
-            isVhdSysPrepped = [boolean] $IsVhdSysPrepped
+            isVhdSysPrepped = $IsVhdSysPrepped
             imageName = $ImageName
             imageDescription = $ImageDescription
           }
@@ -4073,8 +4079,11 @@ function Import-AzDtlCustomImageFromUri {
   }
 "@ | DeployLab -Lab $l -AsJob $false -Parameters $Params | Out-Null
 
-          # Now that we have created the custom image we can remove the vhd
-          Remove-AzureStorageBlob -Context $DestStorageContext -Container 'uploads' -Blob $ImageName | Out-Null
+          # Now that we have created the custom image we can remove the vhd, but only if we did a copy
+          if ($destUri -ine $Uri) {
+              Remove-AzureStorageBlob -Context $DestStorageContext -Container 'uploads' -Blob $ImageName | Out-Null
+          }
+
           $l | Get-AzDtlCustomImage | Where-Object {$_.Name -eq "$ImageName"}
         }
 
