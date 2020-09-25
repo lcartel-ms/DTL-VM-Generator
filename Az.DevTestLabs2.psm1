@@ -517,7 +517,7 @@ function New-AzDtlLab {
       Get-AzureRmResourceGroup -Name $ResourceGroupName -ErrorAction Stop | Out-Null
 
       $CIDRIPv4Regex = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(3[0-2]|[1-2][0-9]|[0-9]))$"
-      if (!($VmCreationSubnetPrefix -match $CIDRIPv4Regex)) {
+      if ($VmCreationSubnetPrefix -and !($VmCreationSubnetPrefix -match $CIDRIPv4Regex)) {
         throw "Not a valid CIDR IPv4 address range"
       }
 
@@ -866,10 +866,30 @@ function Set-AzDtlLabIpPolicy {
 "@ | ConvertFrom-Json
 
       Write-verbose "Retrieving Virtual Network for lab $($Lab.Name) ..."
-      $vnets = Get-AzResource -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName -ResourceType 'Microsoft.DevTestLab/labs/virtualnetworks' -ApiVersion 2018-10-15-preview
+      $vnets = Get-AzResource -Name $Lab.Name -ResourceGroupName $Lab.ResourceGroupName -ResourceType 'Microsoft.DevTestLab/labs/virtualnetworks' -ODataQuery '$expand=Properties($expand=externalSubnets)' -ApiVersion 2018-10-15-preview
 
       # Iterate through the vnets for all the subnets
       foreach ($vnet in $vnets) {
+        
+        # There is a chance that subnet overrides doesn't exist.  This seems to happen if:
+        #  1)  We get to the lab before DTL has fully populated the objects, or 
+        #  2)  If the DTL VM object is created before the underlying VNet subnets are (ordering)
+        #  If they're missing, let's generate the defaults for subnetOverrides
+        if (-not ($vnet.Properties.PSObject.Properties.Name -match "subnetOverrides")) {
+
+            $subnetOverrides = [array] ($vnet.Properties.externalSubnets | ForEach-Object {
+                [PSCustomObject] @{
+                    resourceId = $_.id
+                    labSubnetName = $_.name
+                    useInVmCreationPermission = "Allow"
+                    usePublicIpAddressPermission = "Allow"
+                }
+            })
+            
+            Add-Member -InputObject $vnet.Properties -Name "subnetOverrides" -MemberType NoteProperty -Value $subnetOverrides
+
+        }
+
         # Iterate through the subnets and set the properties appropriately
         foreach ($subnet in $vnet.Properties.subnetOverrides) {
             # Only update if it matches the subnet name/subnetname is missing AND if this is a VNet used for VM Creation
