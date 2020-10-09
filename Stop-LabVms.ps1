@@ -51,5 +51,6 @@ $runningVms | ForEach-Object {
   Start-Sleep -Seconds 2
 }
 
-Wait-RSJobWithProgress -secTimeout (2 * 60 * 60) -jobs $jobs
+# Putting a 4 hour timeout for stopping VMs.  I think we get delays if the VM isn't ready (waiting for vm agent status) which seems to cause timeouts
+Wait-RSJobWithProgress -secTimeout (4 * 60 * 60) -jobs $jobs
 
