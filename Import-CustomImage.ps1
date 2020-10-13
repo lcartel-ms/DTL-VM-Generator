@@ -104,6 +104,10 @@ foreach ($sourceImage in $VmSettings) {
     $uniqueImageName = $DevTestLabName + $sourceImage.imageName    
 
     Import-AzDtlCustomImageFromUri -Lab $lab -Uri $vhdUri -ImageOsType $sourceImage.osType -ImageName $uniqueImageName -ImageDescription $sourceImage.description
+
+    # Delete the VHD, we don't need it after the custom image is created, since it uses managed images
+    Remove-AzureStorageBlob -Context $DestStorageContext -Container 'uploads' -Blob $sourceImage.vhdFileName | Out-Null
+
 }
 
 Write-Output "Copied all images to $DevTestLabName"
