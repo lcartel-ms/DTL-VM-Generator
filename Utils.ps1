@@ -774,7 +774,7 @@ function Invoke-RSForEachLab {
 
   $config | ForEach-Object {
     $lab = $_
-    Write-Host "Starting operating on $($lab.DevTestLabName) ..."
+    Write-Host "Starting operating on configuration for $($lab.DevTestLabName) ..."
 
     # We are getting a string from the csv file, so we need to split it
     if($lab.LabOwners) {
