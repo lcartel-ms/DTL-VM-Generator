@@ -241,13 +241,7 @@ function DeployLab {
 
     if($justAz) {
       Enable-AzureRmAlias -Scope Local -Verbose:$false
-
-      # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-      $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-      $Mutex.WaitOne() | Out-Null
       Enable-AzContextAutosave -Scope Process | Out-Null
-      $rg = Get-AzResourceGroup | Out-Null
-      $Mutex.ReleaseMutex() | Out-Null
     }
 
     # Import again the module
@@ -323,12 +317,7 @@ function DeployVm {
     param($deploymentName, $Name, $ResourceGroupName, $jsonPath, $Parameters, $justAz)
 
     if($justAz) {
-      # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-      $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-      $Mutex.WaitOne() | Out-Null
       Enable-AzContextAutosave -Scope Process | Out-Null
-      $rg = Get-AzResourceGroup | Out-Null
-      $Mutex.ReleaseMutex() | Out-Null
     }
     $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -TemplateParameterObject $Parameters
     Write-debug "Deployment succeded with deployment of `n$deployment"
@@ -670,12 +659,6 @@ function Add-AzDtlLabTags {
                 param($Resource, $IsResourceGroup, $newTags, $justAz)
 
                 Enable-AzureRmAlias -Scope Local -Verbose:$false
-                # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-                Start-Sleep -Seconds (Get-Random -Maximum 30)
-                $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-                $Mutex.WaitOne() | Out-Null
-                $rg = Get-AzResourceGroup -Name "Temp" -ErrorAction SilentlyContinue | Out-Null
-                $Mutex.ReleaseMutex() | Out-Null
 
                 if ($IsResourceGroup) {
                     # Apply the unified tags back to Azure
@@ -1352,13 +1335,7 @@ function Start-AzDtlVm {
           param($vm, $justAz)
 
           if($justAz) {
-            Enable-AzureRmAlias -Scope Local -Verbose:$false
-            # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-            $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-            $Mutex.WaitOne() | Out-Null
             Enable-AzContextAutosave -Scope Process | Out-Null
-            $rg = Get-AzResourceGroup | Out-Null
-            $Mutex.ReleaseMutex() | Out-Null
           }
 
           Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "start" -Force | Out-Null
@@ -1399,13 +1376,7 @@ function Stop-AzDtlVm {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
-            # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-            $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-            $Mutex.WaitOne() | Out-Null
             Enable-AzContextAutosave -Scope Process | Out-Null
-            $rg = Get-AzResourceGroup | Out-Null
-            $Mutex.ReleaseMutex() | Out-Null
-
           }
 
           Invoke-AzureRmResourceAction -ResourceId $vm.ResourceId -Action "stop" -Force | Out-Null
@@ -1905,12 +1876,7 @@ function New-AzDtlBastion {
 
         if($justAz) {
           Enable-AzureRmAlias -Scope Local -Verbose:$false
-          # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-          $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-          $Mutex.WaitOne() | Out-Null
           Enable-AzContextAutosave -Scope Process | Out-Null
-          $rg = Get-AzResourceGroup | Out-Null
-          $Mutex.ReleaseMutex() | Out-Null
         }
 
         # Import again the module
@@ -2094,12 +2060,7 @@ function Remove-AzDtlBastion {
 
         if($justAz) {
           Enable-AzureRmAlias -Scope Local -Verbose:$false
-          # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-          $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-          $Mutex.WaitOne() | Out-Null
           Enable-AzContextAutosave -Scope Process | Out-Null
-          $rg = Get-AzResourceGroup | Out-Null
-          $Mutex.ReleaseMutex() | Out-Null
         }
 
         # Import again the module
@@ -2283,13 +2244,7 @@ function Set-AzDtlVmArtifact {
 
             if($justAz) {
                 Enable-AzureRmAlias -Scope Local -Verbose:$false
-                # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-                $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-                $Mutex.WaitOne() | Out-Null
                 Enable-AzContextAutosave -Scope Process | Out-Null
-                $rg = Get-AzResourceGroup | Out-Null
-                $Mutex.ReleaseMutex() | Out-Null
-
             }
 
             $ResourceGroupName = $v.ResourceGroupName
@@ -2720,12 +2675,7 @@ function New-AzDtlVm {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
-            # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-            $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-            $Mutex.WaitOne() | Out-Null
             Enable-AzContextAutosave -Scope Process | Out-Null
-            $rg = Get-AzResourceGroup | Out-Null
-            $Mutex.ReleaseMutex() | Out-Null
           }
           $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -existingLabName $Name -newVmName $VmName
           Write-debug "Deployment succeded with deployment of `n$deployment"
@@ -3981,13 +3931,9 @@ function Import-AzDtlCustomImageFromUri {
 
           if($justAz) {
             Enable-AzureRmAlias -Scope Local -Verbose:$false
-            # WORKAROUND: https://github.com/Azure/azure-powershell/issues/9448
-            $Mutex = New-Object -TypeName System.Threading.Mutex -ArgumentList $false, "Global\AzDtlLibrary"
-            $Mutex.WaitOne() | Out-Null
             Enable-AzContextAutosave -Scope Process | Out-Null
-            $rg = Get-AzResourceGroup | Out-Null
-            $Mutex.ReleaseMutex() | Out-Null
           }
+          
           # Get storage account for the lab
           $labRgName= $l.ResourceGroupName
           $sourceLab = $l
