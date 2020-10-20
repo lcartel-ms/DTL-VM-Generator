@@ -49,19 +49,24 @@ foreach($descr in $VmSettings) {
   $vmName = $descr.imageName
 
   Write-Host "Starting job to create a VM named $vmName"
-
-  $jobs += $lab | New-AzDtlVm -VmName $vmName `
-                              -Size $descr.size `
-                              -StorageType $descr.storageType `
-                              -CustomImage $imageName `
-                              -Notes $descr.description `
-                              -OsType $descr.osType `
-                              -IpConfig $LabIpConfig `
-                              -AsJob
+  $sb = {
+    param($lab, $vmName, $size, $storageType, $imageName, $description, $osType, $LabIpConfig)
+        New-AzDtlVm -Name $lab.Name `
+                    -ResourceGroupName $lab.ResourceGroupName `
+                    -VmName $vmName `
+                    -Size $size `
+                    -StorageType $storageType `
+                    -CustomImage $imageName `
+                    -Notes $description `
+                    -OsType $osType `
+                    -IpConfig $LabIpConfig
+  }
+  $jobs += Start-RSJob -Name $imageName -ScriptBlock $sb -ArgumentList $lab, $vmName, $descr.size, $descr.storageType, $imageName, $descr.description, $descr.osType, $LabIpConfig -ModulesToImport $AzDtlModulePath
 
   Start-Sleep -Seconds 60
+
 }
 
-Wait-JobWithProgress -secTimeout (5*60*60) -jobs $jobs
+Wait-RSJobWithProgress -secTimeout (5*60*60) -jobs $jobs
 
 Write-Output "VMs created succesfully in $DevTestLabName"
