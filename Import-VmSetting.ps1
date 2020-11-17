@@ -19,7 +19,7 @@ $ErrorActionPreference = 'Stop'
 
 $SourceStorageContext = New-AzStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $StorageAccountKey
 $jsonBlobs = Get-AzStorageBlob -Context $SourceStorageContext -Container $StorageContainerName -Blob '*json'
-Write-Host "Downloading $($jsonBlobs.Count) json files from storage account"
+Write-Host "Downloading $(($jsonBlobs | Measure-Object).Count) json files from storage account"
 
 $downloadFolder = Join-Path $env:TEMP 'CustomImageDownloads'
 if(Test-Path -Path $downloadFolder)

@@ -321,7 +321,7 @@ function Get-VirtualNetworkUnallocatedSpace {
 
       $index = $allocatedSubnetStarts.IndexOf($_)
       $nextsubnetAddressRangeStart = $allocatedSubnetRanges[$_]
-      if ($index+1 -lt $allocatedSubnetRanges.Count) {
+      if ($index+1 -lt ($allocatedSubnetRanges | Measure-Object).Count) {
 
         $nextNextsubnetAddressRangeStart = $allocatedSubnetStarts[$index+1]
         if ($nextsubnetAddressRangeStart -ne $nextNextsubnetAddressRangeStart) {

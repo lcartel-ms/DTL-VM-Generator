@@ -73,7 +73,7 @@ $VmSettings | ForEach-Object {
 
       # Clear any existing DNS settings, in case this is the 2nd+ time through this script
       # since we reset them all anyway, for all the VMs in the lab
-      if ($nic.DnsSettings.DnsServers.Count -gt 0) {
+      if (($nic.DnsSettings.DnsServers | Measure-Object).Count -gt 0) {
         $nic.DnsSettings.DnsServers.Clear()
       }
 
@@ -97,7 +97,7 @@ $VmSettings | ForEach-Object {
 
 } | Out-Null
 
-if($nicsHash.count -eq 0) {
+if(($nicsHash | Measure-Object).count -eq 0) {
   throw "Found no NICS??"
 }
 
