@@ -39,8 +39,11 @@ param
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="The location of the Shared Image Gallery, only required if the SIG doesn't already exist")]
-    [string] $SharedImageGalleryLocation
+    [string] $SharedImageGalleryLocation,
 
+    [Parameter(Mandatory=$false, HelpMessage="Configuration File, see example in directory.  This is needed to define the replication count of images, +1 for each 5 labs.  If the parameter is missing, we assume 1.")]
+    [ValidateNotNullOrEmpty()]
+    [string] $ConfigFile = "config.csv"
 )
 $startTime = Get-Date
 
@@ -49,6 +52,15 @@ Write-Output "Start of script: $StartTime"
 $ErrorActionPreference = 'Stop'
 
 . "./Utils.ps1"
+# Determine the image replication count
+if ($ConfigFile) {
+    $config = Import-ConfigFile -ConfigFile $ConfigFile      # Import all the lab settings from the config file
+    # We need another image replica every 5 labs or so
+    $replicationCount = $([System.Math]::Truncate($config.Count / 5) + 1 )
+}
+else {
+    $replicationCount = 1
+}
 
 $importVhdToSharedImageGalleryScriptBlock = {
     param
@@ -68,6 +80,10 @@ $importVhdToSharedImageGalleryScriptBlock = {
         [ValidateNotNullOrEmpty()]
         [Parameter(Mandatory=$true, HelpMessage="The resource ID of the storage account where VHDs are stored")]
         [string] $StorageAccountResourceId,
+
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory=$true, HelpMessage="The replication count, how many copies of the image we need")]
+        [int] $replicationCount,
 
         [ValidateNotNullOrEmpty()]
         [Parameter(Mandatory=$true, HelpMessage="The tags describing the image version")]
@@ -136,11 +152,11 @@ $importVhdToSharedImageGalleryScriptBlock = {
             "location": "$($SharedImageGallery.Location)",
             "properties": {
                 "publishingProfile": {
-                    "replicaCount": "1",
+                    "replicaCount": "$($replicationCount)",
                     "targetRegions": [
                         {
                             "name": "$($SharedImageGallery.Location)",
-                            "regionalReplicaCount": 1,
+                            "regionalReplicaCount": "$replicationCount",
                             "storageAccountType": "Standard_LRS"
                         }
                     ],
@@ -222,13 +238,21 @@ $StorageAccountKey = (Get-AzstorageAccountKey -Name $StorageAccountName -Resourc
 # Get the list of JSON files in the storage account
 $VmSettings = & "./Import-VmSetting" -StorageAccountName $StorageAccountName -StorageContainerName $StorageContainerName -StorageAccountKey $StorageAccountKey
 
+# Let's scan through and make sure that all the VHD Filenames end in ".vhd", if not - write an error
+$VmSettings | ForEach-Object {
+    If (-not($_.vhdFileName -like "*.vhd")) {
+        Write-Host "vhdFilename must end in .vhd in JSON configuration in storage account" -ForegroundColor Red
+        Write-Error "vhdFilename must end in .vhd in JSON configuration in storage account"
+    }
+}
+
 $jobs = @()
 
 # For each JSON file, we create a image (if there isn't one already), or add a new image version
 foreach ($imageInfo in $VmSettings) {
     Write-Output "Starting job to import $($imageInfo.imageName) image"
     $tagDetails = Split-Tags $imageInfo.psobject.properties
-    $jobs += Start-RSJob -ScriptBlock $importVhdToSharedImageGalleryScriptBlock -ArgumentList $SharedImageGallery, $ImageDefinitions, $imageInfo, $StorageAccountResourceId, $tagDetails -Throttle 25
+    $jobs += Start-RSJob -ScriptBlock $importVhdToSharedImageGalleryScriptBlock -ArgumentList $SharedImageGallery, $ImageDefinitions, $imageInfo, $StorageAccountResourceId, $replicationCount, $tagDetails -Throttle 25
     Start-Sleep -Seconds 15
 }
 
