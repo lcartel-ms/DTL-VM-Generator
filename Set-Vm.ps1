@@ -45,6 +45,54 @@ if ($null -eq $lab) {
     throw "'$DevTestLabName' Lab doesn't exist, can't create VMs in it"
 }
 
+$sb = {
+param($lab, $vmName, $SharedImageGalleryName, $descr, $LabIpConfig)
+
+    if ($descr.OsState -ieq "Generalized") {
+
+        if ($descr.PSObject.Properties -imatch "SSHKey") {
+            # If we have a SSHKey, we know it's Linux and Generalized
+            New-AzDtlVm -Name $lab.Name `
+                        -ResourceGroupName $lab.ResourceGroupName `
+                        -VmName $vmName `
+                        -Size $descr.size `
+                        -StorageType $descr.storageType `
+                        -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
+                        -Notes $descr.description `
+                        -OsType $descr.osType `
+                        -IpConfig $LabIpConfig `
+                        -UserName $descr.Username `
+                        -SshKey $descr.SSHKey
+        }
+        else {
+            # If we have a password, we know it's windows or linux and generalized
+            New-AzDtlVm -Name $lab.Name `
+                        -ResourceGroupName $lab.ResourceGroupName `
+                        -VmName $vmName `
+                        -Size $descr.size `
+                        -StorageType $descr.storageType `
+                        -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
+                        -Notes $descr.description `
+                        -OsType $descr.osType `
+                        -IpConfig $LabIpConfig `
+                        -UserName $descr.Username `
+                        -Password $descr.Password
+        }
+    }
+    else {
+        # Must be specialized custom image
+        New-AzDtlVm -Name $lab.Name `
+                    -ResourceGroupName $lab.ResourceGroupName `
+                    -VmName $vmName `
+                    -Size $descr.size `
+                    -StorageType $descr.storageType `
+                    -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
+                    -Notes $descr.description `
+                    -OsType $descr.osType `
+                    -IpConfig $LabIpConfig
+    }
+}
+
 $jobs = @()
 
 foreach($descr in $VmSettings) {
@@ -53,51 +101,11 @@ foreach($descr in $VmSettings) {
 
   Write-Host "Starting job to create a VM named $vmName"
 
-  if ($descr.osType -ieq "Generalized") {
-
-    if ($descr.PSObject.Properties -imatch "SSHKey") {
-        # If we have a SSHKey, we know it's Linux and Generalized
-        $jobs += $lab | New-AzDtlVm -VmName $vmName `
-                                    -Size $descr.size `
-                                    -StorageType $descr.storageType `
-                                    -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
-                                    -Notes $descr.description `
-                                    -OsType $descr.osType `
-                                    -IpConfig $LabIpConfig `
-                                    -UserName $descr.Username `
-                                    -SshKey $descr.SSHKey `
-                                    -AsJob
-
-    }
-    else {
-        # If we have a password, we know it's windows or linux and generalized
-        $jobs += $lab | New-AzDtlVm -VmName $vmName `
-                                    -Size $descr.size `
-                                    -StorageType $descr.storageType `
-                                    -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
-                                    -Notes $descr.description `
-                                    -OsType $descr.osType `
-                                    -IpConfig $LabIpConfig `
-                                    -UserName $descr.Username `
-                                    -Password $descr.Password `
-                                    -AsJob
-    }
-  }
-  else {
-      # Must be specialized custom image
-      $jobs += $lab | New-AzDtlVm -VmName $vmName `
-                                  -Size $descr.size `
-                                  -StorageType $descr.storageType `
-                                  -SharedImageGalleryImage "$SharedImageGalleryName/$($descr.imageName)" `
-                                  -Notes $descr.description `
-                                  -OsType $descr.osType `
-                                  -IpConfig $LabIpConfig `
-                                  -AsJob
-  }
+  $jobs += Start-RSJob -Name $vmName -ScriptBlock $sb -ArgumentList $lab, $vmName, $SharedImageGalleryName, $descr, $LabIpConfig -ModulesToImport $AzDtlModulePath
 
   Start-Sleep -Seconds 60
 }
 
-Wait-JobWithProgress -secTimeout (5*60*60) -jobs $jobs
+Wait-RSJobWithProgress -secTimeout (5*60*60) -jobs $jobs
 
 Write-Output "VMs created succesfully in $DevTestLabName"

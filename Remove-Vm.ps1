@@ -27,17 +27,22 @@ if (-not $existingLab) {
 Write-Host "Removing Vms from lab $DevTestLabName in $ResourceGroupName"
 $vms = Get-AzDtlVm -Lab $existingLab
 
-$selectedVms = Select-Vms $vms
+$selectedVms = Select-Vms $vms -ImagePattern $ImagePattern -ErrorAction SilentlyContinue
 
 $jobs = @()
-$selectedVms | ForEach-Object {
+if ($selectedVms) {
+    $selectedVms | ForEach-Object {
 
-  $sb = {
-    Remove-AzDtlVm -Vm $_
-  }
-  $jobs += Start-RSJob -ScriptBlock $sb -Name $_.Name -ModulesToImport $AzDtlModulePath
+      $sb = {
+        Remove-AzDtlVm -Vm $_ | Out-Null
+      }
+      $jobs += Start-RSJob -ScriptBlock $sb -Name $_.Name -ModulesToImport $AzDtlModulePath
 
-  Start-Sleep -Seconds 2
+      Start-Sleep -Seconds 2
+    }
+
+    Wait-RSJobWithProgress -secTimeout (2 * 60 * 60) -jobs $jobs
 }
-
-Wait-RSJobWithProgress -secTimeout (2 * 60 * 60) -jobs $jobs
+else {
+    Write-Output "No VMs to remove for Lab $DevTestLabName"
+}

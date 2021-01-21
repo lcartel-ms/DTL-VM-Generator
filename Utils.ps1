@@ -507,7 +507,7 @@ function Select-Vms {
       }
     }
     if(-not $newVms) {
-      throw "No vm selected by the ImagePattern chosen in $DevTestLabName"
+      Write-Error "No vm selected by the ImagePattern chosen in $DevTestLabName"
     }
 
     return $newVms
@@ -767,7 +767,6 @@ function Invoke-RSForEachLab {
     [string] $ImagePattern = "",
     [string] $IfExist = "Leave",
     [int] $SecTimeout = 5 * 60 * 60,
-    [string] $MatchBy = "",
     [string[]] $ModulesToImport
   )
 
@@ -823,7 +822,6 @@ function Invoke-RSForEachLab {
       CustomRole='$($customRole)';
       ImagePattern='$($ImagePattern)';
       IfExist='$($IfExist)';
-      MatchBy='$($MatchBy)'
     }"
 
     $sb = [scriptblock]::create(
