@@ -101,7 +101,7 @@ foreach($descr in $VmSettings) {
 
   Write-Host "Starting job to create a VM named $vmName"
 
-  $jobs += Start-RSJob -Name $vmName -ScriptBlock $sb -ArgumentList $lab, $vmName, $SharedImageGalleryName, $descr, $LabIpConfig -ModulesToImport $AzDtlModulePath
+  $jobs += Start-RSJob -Name "$vmName-JobId$(Get-Random)" -ScriptBlock $sb -ArgumentList $lab, $vmName, $SharedImageGalleryName, $descr, $LabIpConfig -ModulesToImport $AzDtlModulePath
 
   Start-Sleep -Seconds 60
 }

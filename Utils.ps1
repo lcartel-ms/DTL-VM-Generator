@@ -831,7 +831,7 @@ function Invoke-RSForEachLab {
     .{$(get-content $script -Raw)} @params
 "@)
 
-    $jobs += Start-RSJob -Name $lab.DevTestLabName -ScriptBlock $sb -ModulesToImport $ModulesToImport
+    $jobs += Start-RSJob -Name "$($lab.DevTestLabName)-JobId$(Get-Random)" -ScriptBlock $sb -ModulesToImport $ModulesToImport
     Start-Sleep -Seconds $SecondsBetweenLoops
   }
 
