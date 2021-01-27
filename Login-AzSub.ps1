@@ -5,6 +5,6 @@ param
 )
 
 Clear-AzContext -Scope CurrentUser -Force
-Connect-AzAccount
-Set-AzContext -SubscriptionId $SubscriptionId
+Add-AzAccount
+Select-AzSubscription -Subscription $SubscriptionId
 Enable-AzContextAutosave -Scope CurrentUser
