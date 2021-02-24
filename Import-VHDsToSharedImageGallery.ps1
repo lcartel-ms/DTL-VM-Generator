@@ -56,7 +56,7 @@ $ErrorActionPreference = 'Stop'
 if ($ConfigFile) {
     $config = Import-ConfigFile -ConfigFile $ConfigFile      # Import all the lab settings from the config file
     # We need another image replica every 5 labs or so
-    $replicationCount = $([System.Math]::Truncate($config.Count / 10) + 1 )
+    $replicationCount = $([System.Math]::Truncate(($config | Measure-Object).Count / 10) + 1 )
 }
 else {
     $replicationCount = 1

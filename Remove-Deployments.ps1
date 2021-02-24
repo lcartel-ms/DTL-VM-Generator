@@ -10,7 +10,7 @@ param
 Write-Host "Start removal ..."
 
 $deployments = Get-AzResourceGroupDeployment -ResourceGroupName $ResourceGroupName
-Write-Host "Deployments: $($deployments.Count)"
+Write-Host "Deployments: $(($deployments | Measure-Object).Count)"
 
 $deploymentsToDelete = $deployments | Where-Object { $_.Timestamp -lt ((get-date).AddDays($HowManyDaysBefore)) }
 
