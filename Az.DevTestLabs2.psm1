@@ -764,7 +764,7 @@ function Add-AzDtlLabTags {
             # If we don't have any source tags, just write the new tags
             
             if (-not (Get-Member -InputObject $Resource -Name 'Tags') -or 
-                (($Resource.Tags | Measure.Object).Count -eq 0) -or
+                (($Resource.Tags | Measure-Object).Count -eq 0) -or
                 (Compare-Hashtable -Left $Resource.Tags -Right $newTags)) {
 
                 if($AsJob) {
