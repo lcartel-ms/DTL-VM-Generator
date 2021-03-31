@@ -5,7 +5,7 @@ param
     [string] $ConfigFile = "config.csv",
     
     [Parameter(Mandatory=$false, HelpMessage="How many seconds to wait before starting the next parallel lab creation")]
-    [int] $SecondsBetweenLoop =  10,
+    [int] $SecondsBetweenLoop =  60,
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="Custom Role to add users to")]
@@ -16,7 +16,6 @@ $ErrorActionPreference = "Stop"
 
 # Common setup for scripts
 . "./Utils.ps1"                                          # Import all our utilities
-Import-AzDtlModule                                       # Import the DTL Library
 $config = Import-ConfigFile -ConfigFile $ConfigFile      # Import all the lab settings from the config file
 
 $config | ForEach-Object {
@@ -32,54 +31,55 @@ $config | ForEach-Object {
 }
 $configCount = ($config | Measure-Object).Count
 
-# Use new DTL Library here to create new labs
 Write-Host "---------------------------------" -ForegroundColor Green
 Write-Host "Creating $configCount labs..." -ForegroundColor Green
-$labCreateJobs = $config | ForEach-Object {
-                                $_ | New-AzDtlLab -VmCreationSubnetPrefix "10.0.0.0/21" -AsJob
-                                Start-Sleep -Seconds $SecondsBetweenLoop
-                           }
-Wait-JobWithProgress -jobs $labCreateJobs -secTimeout 1200
 
-# Update the shutdown policy on the labs
-Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Updating $configCount labs with correct shutdown policy..." -ForegroundColor Green
-Wait-JobWithProgress -jobs ($config | Set-AzDtlLabShutdown -AsJob) -secTimeout 300
+$LabCreateSB = {
+param($labConfig, $customRole)
 
-# Add in Shared Image Gallery to the labs
-Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Connecting Shared Image Gallery to  $configCount labs ..." -ForegroundColor Green
-$config | ForEach-Object {
-    $SharedImageGallery = Get-AzGallery -Name $_.SharedImageGalleryName
+    # Make sure we stop for errors
+    $ErrorActionPreference = "Stop"
+
+    Write-Output "Creating Lab $($labConfig.DevTestLabName) in Resource group $($labConfig.ResourceGroupName)"
+    $lab = $labConfig | New-AzDtlLab -VmCreationSubnetPrefix "10.0.0.0/21"
+
+    Write-Output "   Updating shutdown policy for lab $($labConfig.DevTestLabName)"
+    $lab = $labConfig | Set-AzDtlLabShutdown
+
+    Write-Output "   Connecting Shared Image Gallery to lab $($labConfig.DevTestLabName)"
+    $SharedImageGallery = Get-AzGallery -Name $labConfig.SharedImageGalleryName
     if (-not $SharedImageGallery) {
-        Throw "Unable to update lab '$($_.Name)', '$($_.SharedImageGalleryName)' shared image gallery does not exist."
+        Throw "Unable to update lab '$($labConfig.DevTestLabName)', '$($labConfig.SharedImageGalleryName)' shared image gallery does not exist."
     }
-    $_ | Get-AzDtlLab | Set-AzDtlLabSharedImageGallery -Name $_.SharedImageGalleryName -ResourceId $SharedImageGallery.Id
+    $sharedImageGallery = $labConfig | Get-AzDtlLab | Set-AzDtlLabSharedImageGallery -Name $labConfig.SharedImageGalleryName -ResourceId $SharedImageGallery.Id
+
+    Write-Output "   Updating IP policy to $($labConfig.IpConfig) for lab $($labConfig.DevTestLabName)"
+    $result = Set-AzDtlLabIpPolicy -Lab $labConfig -IpConfig $labConfig.IpConfig
+
+    #Write-Output "   Adding owners & users for lab $($labConfig.DevTestLabName)"
+    #$result = Set-LabAccessControl $labConfig.DevTestLabName $labConfig.ResourceGroupName $CustomRole $labConfig.LabOwners $labConfig.LabUsers
+
+    Write-Output "Completed creating lab $($labConfig.DevTestLabName) in Resource group $($labConfig.ResourceGroupName)"
 }
 
-# Update the IP Policy on the labs
-Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Updating $configCount labs with IP Policy ..." -ForegroundColor Green
+$labCreateJobs = @()
 $config | ForEach-Object {
-    Set-AzDtlLabIpPolicy -Lab $_ -IpConfig $_.IpConfig
+    # $labCreateJobs += Start-RSJob -Name "$($_.DevTestLabName)-JobId$(Get-Random)" -ScriptBlock $LabCreateSB -ArgumentList $_, $CustomRole -ModulesToImport $AzDtlModulePath -FunctionFilesToImport (Resolve-Path ".\Utils.ps1").Path
+    $labCreateJobs += Start-RSJob -Name "$($_.DevTestLabName)-JobId$(Get-Random)" -ScriptBlock $LabCreateSB -ArgumentList $_, $CustomRole -ModulesToImport $AzDtlModulePath
+    Start-Sleep -Seconds $SecondsBetweenLoop
 }
+
+# We wait additional hour for every 10 jobs, starting at 4 hours
+$timeout = 4 + [int] ($configCount / 10)
+Wait-RSJobWithProgress -secTimeout ($timeout*60*60) -jobs $labCreateJobs
 
 $configBastion = [Array] ($config | Where-Object { $_.BastionEnabled })
 if (($configBastion | Measure-Object).Count -gt 0) {
     # Deploy the Azure Bastion hosts to the labs
     Write-Host "---------------------------------" -ForegroundColor Green
-    Write-Host "Deploying $($configBastion.Count) Bastion hosts to the labs..." -ForegroundColor Green
+    Write-Host "Deploying $(($configBastion | Measure-Object).Count) Bastion hosts to the labs..." -ForegroundColor Green
     # Currently use Leave strategy for existing Bastions
     "./Deploy-Bastion.ps1" | Invoke-RSForEachLab -ConfigFile $ConfigFile -SecondsBetweenLoop $SecondsBetweenLoop -SecTimeout (8 * 60 * 60) -CustomRole $null -ModulesToImport $AzDtlModulePath
 }
 
-# Add appropriate owner/user permissions for the labs
-Write-Host "---------------------------------" -ForegroundColor Green
-Write-Host "Adding owners & users for $configCount labs..." -ForegroundColor Green
-$config | ForEach-Object {
-    Set-LabAccessControl $_.DevTestLabName $_.ResourceGroupName $CustomRole $_.LabOwners $_.LabUsers
-}
-
 Write-Host "Completed creating labs!" -ForegroundColor Green
-
-Remove-AzDtlModule                                       # Remove the DTL Library
