@@ -258,7 +258,6 @@ function DeployLab {
     $lab = Get-AzureRmResource -Name $Name -ResourceGroupName $ResourceGroupName -ExpandProperties
     
     if ($VmCreationSubnetPrefix) {
-
       $labVnet = $lab | Get-AzDtlLabVirtualNetworks -ExpandedNetwork
       $labVnet.Subnets[0].AddressPrefix = $VmCreationSubnetPrefix
       $labVnet = Set-AzureRmVirtualNetwork -VirtualNetwork $labVnet
@@ -267,10 +266,7 @@ function DeployLab {
     }
 
     if ($VmCreationResourceGroupName) {
-
-      Set-AzDtlVmCreationResourceGroup -Lab $lab -VmCreationResourceGroupName $VmCreationResourceGroupName
-
-      $lab = Get-AzureRmResource -Name $Name -ResourceGroupName $ResourceGroupName -ExpandProperties
+      $lab = Set-AzDtlVmCreationResourceGroup -Lab $lab -VmCreationResourceGroupName $VmCreationResourceGroupName
     }
 
     $lab
@@ -1830,8 +1826,8 @@ function Set-AzDtlVmCreationResourceGroup {
       # We need to check if provided VmCreationResourceGroup name exists. Fail if it doesn't.
       $vmCreationResourceGroup = Get-AzureRmResourceGroup -Name $VmCreationResourceGroupName -ErrorAction Stop
 
-      # Properties.vmCreationResourceGroupId will be set depending on the API version being used. Abstract this behavior by overwriting the property.  
-      $Lab.Properties | Add-Member -Name 'vmCreationResourceGroupId' -Value $vmCreationResourceGroup.ResourceId -MemberType NoteProperty -Force
+      # Properties.vmCreationResourceGroupId property is never set no matter the API versions. We need to add it to the request.  
+      $Lab.Properties | Add-Member -Name 'vmCreationResourceGroupId' -Value $vmCreationResourceGroup.ResourceId -MemberType NoteProperty
 
       Set-AzureRmResource `
         -ResourceId $Lab.ResourceId `
@@ -1839,7 +1835,7 @@ function Set-AzDtlVmCreationResourceGroup {
         -Properties $Lab.Properties `
         -Force | Out-Null
 
-      Write-Host "Lab VmCreationResourceGroupId successfully updated to '$VmCreationResourceGroupName'"
+      Write-Host "Lab '$($Lab.Name)' VM resource group successfully updated to '$VmCreationResourceGroupName'"
       
       $Lab | Get-AzDtlLab
     }
