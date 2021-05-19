@@ -652,7 +652,8 @@ function Import-ConfigFile {
       $lab.BastionEnabled = $false
     }
 
-    if ($lab.VmCreationResourceGroupName -eq "default") {
+    # If Vm ResourceGroupName is set to 'default'
+    if ($lab.VmCreationResourceGroupName -ieq "default") {
       $lab.VmCreationResourceGroupName = $null
     }
 
