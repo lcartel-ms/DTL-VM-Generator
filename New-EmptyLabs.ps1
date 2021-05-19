@@ -30,14 +30,12 @@ $config | ForEach-Object {
     }
 
     # If specified create any/all the resource groups where VMs should be created
-    # The SilentlyContinue bit is to suppress the error that otherwise this generates.
-
     if ($_.VmCreationResourceGroupName) {
         
         $existingVmCreationRg = Get-AzResourceGroup -Name $_.VmCreationResourceGroupName -Location $_.LabRegion -ErrorAction SilentlyContinue
 
         if(-not $existingVmCreationRg) {
-          Write-Host "Creating Resource Group '$($_.ResourceGroupName)' ..." -ForegroundColor Green
+          Write-Host "Creating Resource Group '$($_.VmCreationResourceGroupName)' for lab '$($_.DevTestLabName)' ..." -ForegroundColor Green
           New-AzResourceGroup -Name $_.VmCreationResourceGroupName -Location $_.LabRegion | Out-Null
         }
     }
