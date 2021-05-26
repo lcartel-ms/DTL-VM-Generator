@@ -214,9 +214,14 @@ function DeployLab {
   $Name = $Lab.Name
   $ResourceGroupName = $Lab.ResourceGroupName
   $VmCreationSubnetPrefix = $null
+  $VmCreationResourceGroupName = $null
 
   if (Get-Member -InputObject $Lab -Name VmCreationSubnetPrefix -MemberType Properties) {
     $VmCreationSubnetPrefix = $Lab.VmCreationSubnetPrefix
+  }
+
+  if (Get-Member -InputObject $Lab -Name VmCreationResourceGroupName -MemberType Properties) {
+    $VmCreationResourceGroupName = $Lab.VmCreationResourceGroupName
   }
 
   if ($Name.Length -gt 40) {
@@ -237,7 +242,7 @@ function DeployLab {
   $jsonPath = StringToFile($arm)
 
   $sb = {
-    param($deploymentName, $Name, $ResourceGroupName, $VmCreationSubnetPrefix, $jsonPath, $Parameters, $workingDir, $justAz)
+    param($deploymentName, $Name, $ResourceGroupName, $VmCreationSubnetPrefix, $VmCreationResourceGroupName, $jsonPath, $Parameters, $workingDir, $justAz)
 
     if($justAz) {
       Enable-AzureRmAlias -Scope Local -Verbose:$false
@@ -251,8 +256,8 @@ function DeployLab {
     Write-debug "Deployment succeded with deployment of `n$deployment"
 
     $lab = Get-AzureRmResource -Name $Name -ResourceGroupName $ResourceGroupName -ExpandProperties
+    
     if ($VmCreationSubnetPrefix) {
-
       $labVnet = $lab | Get-AzDtlLabVirtualNetworks -ExpandedNetwork
       $labVnet.Subnets[0].AddressPrefix = $VmCreationSubnetPrefix
       $labVnet = Set-AzureRmVirtualNetwork -VirtualNetwork $labVnet
@@ -260,13 +265,17 @@ function DeployLab {
       $lab = Get-AzureRmResource -Name $Name -ResourceGroupName $ResourceGroupName -ExpandProperties
     }
 
+    if ($VmCreationResourceGroupName) {
+      $lab = Set-AzDtlVmCreationResourceGroup -Lab $lab -VmCreationResourceGroupName $VmCreationResourceGroupName
+    }
+
     $lab
   }
 
   if($AsJob) {
-    Start-Job      -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $VmCreationSubnetPrefix, $jsonPath, $Parameters, $PWD, $justAz
+    Start-Job      -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $VmCreationSubnetPrefix, $VmCreationResourceGroupName, $jsonPath, $Parameters, $PWD, $justAz
   } else {
-    Invoke-Command -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $VmCreationSubnetPrefix, $jsonPath, $Parameters, $PWD, $justAz
+    Invoke-Command -ScriptBlock $sb -ArgumentList $deploymentName, $Name, $ResourceGroupName, $VmCreationSubnetPrefix, $VmCreationResourceGroupName, $jsonPath, $Parameters, $PWD, $justAz
   }
 }
 
@@ -501,6 +510,9 @@ function New-AzDtlLab {
     [ValidateNotNullOrEmpty()]
     [string] $ResourceGroupName,
 
+    [parameter(Mandatory=$false,HelpMessage="The resource group in which all new lab virtual machines will be created. To let DevTest Labs manage resource group creation, set this value to null.")]
+    [string] $VmCreationResourceGroupName,
+
     [parameter(Mandatory=$false,HelpMessage="IP address prefix (CIDR notation) within 10.0.0.0/20 reserved for VMs creation. (e.g 10.0.0.0/21, 10.)")]
     [ValidateNotNullOrEmpty()]
     [string] $VmCreationSubnetPrefix,
@@ -533,6 +545,10 @@ function New-AzDtlLab {
 
       if ($VmCreationSubnetPrefix) {
         $Lab | Add-member -Name 'VmCreationSubnetPrefix' -Value $VmCreationSubnetPrefix -MemberType NoteProperty
+      }
+
+      if ($VmCreationResourceGroupName) {
+        $Lab | Add-member -Name 'VmCreationResourceGroupName' -Value $VmCreationResourceGroupName -MemberType NoteProperty
       }
 
 # Taken from official sample here: https://github.com/Azure/azure-devtestlab/blob/master/Samples/101-dtl-create-lab/azuredeploy.json
@@ -1784,6 +1800,46 @@ function Get-AzDtlLabVirtualNetworkSubnets {
         }
     } catch {
 
+      Write-Error -ErrorRecord $_ -EA $callerEA
+    }
+  }
+  end {}
+}
+
+function Set-AzDtlVmCreationResourceGroup {
+  [CmdletBinding()]
+  param(
+    [parameter(Mandatory=$true,HelpMessage="Lab where to update the VmCreationResourceGroup.", ValueFromPipeline=$true)]
+    [ValidateNotNullOrEmpty()]
+    $Lab,
+
+    [parameter(Mandatory=$false,HelpMessage="The resource group in which all new lab virtual machines will be created. To let DevTest Labs manage resource group creation, set this value to null.")]
+    [string] $VmCreationResourceGroupName
+  )
+
+  begin {. BeginPreamble}
+  process {
+    try {
+
+      $Lab = $Lab | Get-AzDtlLab
+
+      # We need to check if provided VmCreationResourceGroup name exists. Fail if it doesn't.
+      $vmCreationResourceGroup = Get-AzureRmResourceGroup -Name $VmCreationResourceGroupName -ErrorAction Stop
+
+      # Properties.vmCreationResourceGroupId property is never set no matter the API versions. We need to add it to the request.  
+      $Lab.Properties | Add-Member -Name 'vmCreationResourceGroupId' -Value $vmCreationResourceGroup.ResourceId -MemberType NoteProperty
+
+      Set-AzureRmResource `
+        -ResourceId $Lab.ResourceId `
+        -ApiVersion 2018-10-15-preview `
+        -Properties $Lab.Properties `
+        -Force | Out-Null
+
+      Write-Host "Lab '$($Lab.Name)' VM resource group successfully updated to '$VmCreationResourceGroupName'"
+      
+      $Lab | Get-AzDtlLab
+    }
+    catch {
       Write-Error -ErrorRecord $_ -EA $callerEA
     }
   }
@@ -4118,6 +4174,8 @@ New-Alias -Name 'Dtl-ConvertVirtualNetwork'     -Value Convert-AzDtlVirtualNetwo
 New-Alias -Name 'Dtl-GetVirtualNetworks'        -Value Get-AzDtlLabVirtualNetworks
 New-Alias -Name 'Dtl-GetVirtualNetworkSubnets'  -Value Get-AzDtlLabVirtualNetworkSubnets
 
+New-Alias -Name 'Dtl-SetVmCreationResourceGroup'  -Value Set-AzDtlVmCreationResourceGroup
+
 New-Alias -Name 'Dtl-SetLabBrowserConnect'  -Value Set-AzDtlLabBrowserConnect
 New-Alias -Name 'Dtl-NewBastion'            -Value New-AzDtlBastion
 New-Alias -Name 'Dtl-GetBastion'            -Value Get-AzDtlBastion
@@ -4168,6 +4226,7 @@ Export-ModuleMember -Function New-AzDtlLab,
                               Convert-AzDtlVirtualNetwork,
                               Get-AzDtlLabVirtualNetworks,
                               Get-AzDtlLabVirtualNetworkSubnets,
+                              Set-AzDtlVmCreationResourceGroup,
                               Set-AzDtlLabBrowserConnect,
                               New-AzDtlBastion,
                               Get-AzDtlBastion,

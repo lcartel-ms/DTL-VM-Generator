@@ -28,6 +28,17 @@ $config | ForEach-Object {
       Write-Host "Creating Resource Group '$($_.ResourceGroupName)' ..." -ForegroundColor Green
       New-AzResourceGroup -Name $_.ResourceGroupName -Location $_.LabRegion | Out-Null
     }
+
+    # If specified create any/all the resource groups where VMs should be created
+    if ($_.VmCreationResourceGroupName) {
+        
+        $existingVmCreationRg = Get-AzResourceGroup -Name $_.VmCreationResourceGroupName -Location $_.LabRegion -ErrorAction SilentlyContinue
+
+        if(-not $existingVmCreationRg) {
+          Write-Host "Creating Resource Group '$($_.VmCreationResourceGroupName)' for lab '$($_.DevTestLabName)' ..." -ForegroundColor Green
+          New-AzResourceGroup -Name $_.VmCreationResourceGroupName -Location $_.LabRegion | Out-Null
+        }
+    }
 }
 $configCount = ($config | Measure-Object).Count
 
@@ -41,7 +52,7 @@ param($labConfig, $customRole)
     $ErrorActionPreference = "Stop"
 
     Write-Output "Creating Lab $($labConfig.DevTestLabName) in Resource group $($labConfig.ResourceGroupName)"
-    $lab = $labConfig | New-AzDtlLab -VmCreationSubnetPrefix "10.0.0.0/21"
+    $lab = $labConfig | New-AzDtlLab -VmCreationSubnetPrefix "10.0.0.0/21" -VmCreationResourceGroupName $labConfig.VmCreationResourceGroupName
 
     Write-Output "   Updating shutdown policy for lab $($labConfig.DevTestLabName)"
     $lab = $labConfig | Set-AzDtlLabShutdown

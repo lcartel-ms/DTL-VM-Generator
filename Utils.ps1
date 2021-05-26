@@ -318,7 +318,7 @@ function Get-VirtualNetworkUnallocatedSpace {
     # Ordered Array of unallocated ranges (CIDR notation) calculated as a complement to the above table
     $unallocatedSubnetRanges = [System.Collections.ArrayList]@()
 
-    $allocatedSubnetStarts = [array]$allocatedSubnetRanges.Keys
+    $allocatedSubnetStarts = [array]($allocatedSubnetRanges.Keys | Sort-Object)
     $allocatedSubnetStarts | ForEach-Object {
 
       $index = $allocatedSubnetStarts.IndexOf($_)
@@ -650,6 +650,11 @@ function Import-ConfigFile {
       $lab.BastionEnabled = [System.Convert]::ToBoolean($lab.BastionEnabled)
     } else {
       $lab.BastionEnabled = $false
+    }
+
+    # If Vm ResourceGroupName is set to 'default'
+    if ($lab.VmCreationResourceGroupName -ieq "default") {
+      $lab.VmCreationResourceGroupName = $null
     }
 
     # Also add "Name" since that's used by the DTL Library for DevTestLabName
