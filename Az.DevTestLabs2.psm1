@@ -263,7 +263,7 @@ function DeployLab {
     }
 
     if ($VmCreationResourceGroupName) {
-      
+
       # Import again the module, only if it hasn't already been imported
       if (-not (Get-Command -Name "Get-AzDtlLab")) {
         Import-Module "$workingDir\Az.DevTestLabs2.psm1"
@@ -1830,7 +1830,7 @@ function Set-AzDtlVmCreationResourceGroup {
       $vmCreationResourceGroup = Get-AzureRmResourceGroup -Name $VmCreationResourceGroupName -ErrorAction Stop
 
       # Properties.vmCreationResourceGroupId property is never set no matter the API versions. We need to add it to the request.  
-      $Lab.Properties | Add-Member -Name 'vmCreationResourceGroupId' -Value $vmCreationResourceGroup.ResourceId -MemberType NoteProperty
+      $Lab.Properties | Add-Member -Name 'vmCreationResourceGroupId' -Value $vmCreationResourceGroup.ResourceId -MemberType NoteProperty -Force
 
       Set-AzureRmResource `
         -ResourceId $Lab.ResourceId `
