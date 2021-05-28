@@ -50,7 +50,7 @@ param($labConfig, $customRole)
 
     # Make sure we stop for errors
     $ErrorActionPreference = "Stop"
-
+    
     Write-Output "Creating Lab $($labConfig.DevTestLabName) in Resource group $($labConfig.ResourceGroupName)"
     $lab = $labConfig | New-AzDtlLab -VmCreationSubnetPrefix "10.0.0.0/21" -VmCreationResourceGroupName $labConfig.VmCreationResourceGroupName
 
@@ -67,16 +67,15 @@ param($labConfig, $customRole)
     Write-Output "   Updating IP policy to $($labConfig.IpConfig) for lab $($labConfig.DevTestLabName)"
     $result = Set-AzDtlLabIpPolicy -Lab $labConfig -IpConfig $labConfig.IpConfig
 
-    #Write-Output "   Adding owners & users for lab $($labConfig.DevTestLabName)"
-    #$result = Set-LabAccessControl $labConfig.DevTestLabName $labConfig.ResourceGroupName $CustomRole $labConfig.LabOwners $labConfig.LabUsers
+    Write-Output "   Adding owners & users for lab $($labConfig.DevTestLabName)"
+    $result = Set-LabAccessControl $labConfig.DevTestLabName $labConfig.ResourceGroupName $CustomRole $labConfig.LabOwners $labConfig.LabUsers
 
     Write-Output "Completed creating lab $($labConfig.DevTestLabName) in Resource group $($labConfig.ResourceGroupName)"
 }
 
 $labCreateJobs = @()
 $config | ForEach-Object {
-    # $labCreateJobs += Start-RSJob -Name "$($_.DevTestLabName)-JobId$(Get-Random)" -ScriptBlock $LabCreateSB -ArgumentList $_, $CustomRole -ModulesToImport $AzDtlModulePath -FunctionFilesToImport (Resolve-Path ".\Utils.ps1").Path
-    $labCreateJobs += Start-RSJob -Name "$($_.DevTestLabName)-JobId$(Get-Random)" -ScriptBlock $LabCreateSB -ArgumentList $_, $CustomRole -ModulesToImport $AzDtlModulePath
+    $labCreateJobs += Start-RSJob -Name "$($_.DevTestLabName)-JobId$(Get-Random)" -ScriptBlock $LabCreateSB -ArgumentList $_, $CustomRole -ModulesToImport $AzDtlModulePath -FunctionsToImport Set-LabAccessControl
     Start-Sleep -Seconds $SecondsBetweenLoop
 }
 

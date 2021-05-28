@@ -249,9 +249,6 @@ function DeployLab {
       Enable-AzContextAutosave -Scope Process | Out-Null
     }
 
-    # Import again the module
-    Import-Module "$workingDir\Az.DevTestLabs2.psm1"
-
     $deployment = New-AzureRmResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $jsonPath -TemplateParameterObject $Parameters
     Write-debug "Deployment succeded with deployment of `n$deployment"
 
@@ -266,6 +263,12 @@ function DeployLab {
     }
 
     if ($VmCreationResourceGroupName) {
+      
+      # Import again the module, only if it hasn't already been imported
+      if (-not (Get-Command -Name "Get-AzDtlLab")) {
+        Import-Module "$workingDir\Az.DevTestLabs2.psm1"
+      }
+
       $lab = Set-AzDtlVmCreationResourceGroup -Lab $lab -VmCreationResourceGroupName $VmCreationResourceGroupName
     }
 
