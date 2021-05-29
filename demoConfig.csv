@@ -1,11 +1,7 @@
-DevTestLabName,ResourceGroupName,VmCreationResourceGroupName,IpConfig,BastionEnabled,SharedImageGalleryName,ShutDownTime,TimezoneId,LabRegion,LabOwners,LabUsers
-Cybi1,Cybe3r,Cybe3rVmRg,Private,true,SharedImageGallery_DevTestLabs, 1900, "W. Europe Standard Time", westeurope, "phauge@microsoft.com", "lucabol@microsoft.com,phauge@microsoft.com"
-Cybi2,Cybe3r,Cybe3rVmRg,Public,false,SharedImageGallery_DevTestLabs, 1900, "W. Europe Standard Time", westeurope, "phauge@microsoft.com", "lucabol@microsoft.com,phauge@microsoft.com"
-Cybi3,Cybe3r,Cybe3rVmRg,Shared,false,SharedImageGallery_DevTestLabs, 1900, "W. Europe Standard Time", westeurope, "phauge@microsoft.com", "lucabol@microsoft.com,phauge@microsoft.com"
-Cybi4,Cybe3r,Cybe3rVmRg,Shared,false,SharedImageGallery_DevTestLabs, 1900, "W. Europe Standard Time", westeurope, "phauge@microsoft.com", "lucabol@microsoft.com,phauge@microsoft.com"
-Cybi5,Cybe3r,Cybe3rVmRg,Private,false,SharedImageGallery_DevTestLabs, 1900, "W. Europe Standard Time", westeurope, "phauge@microsoft.com", "lucabol@microsoft.com,phauge@microsoft.com"
-Cybi6,Cybe3r,Cybe3rVmRg,Private,false,SharedImageGallery_DevTestLabs, 1900, "W. Europe Standard Time", westeurope, "phauge@microsoft.com", "lucabol@microsoft.com,phauge@microsoft.com"
-Cybi7,Cybe3r,Cybe3rVmRg,Public,false,SharedImageGallery_DevTestLabs, 1900, "W. Europe Standard Time", westeurope, "phauge@microsoft.com", "lucabol@microsoft.com,phauge@microsoft.com"
-Cybi8,Cybe3r,Cybe3rVmRg,Shared,false,SharedImageGallery_DevTestLabs, 1900, "W. Europe Standard Time", westeurope, "phauge@microsoft.com", "lucabol@microsoft.com,phauge@microsoft.com"
-Cybi9,Cybe3r,Cybe3rVmRg,Public,false,SharedImageGallery_DevTestLabs, 1900, "W. Europe Standard Time", westeurope, "phauge@microsoft.com", "lucabol@microsoft.com,phauge@microsoft.com"
-Cybi10,Cybe3r,Cybe3rVmRg,Shared,false,SharedImageGallery_DevTestLabs, 1900, "W. Europe Standard Time", westeurope, "phauge@microsoft.com", "lucabol@microsoft.com,phauge@microsoft.com"
+DevTestLabName,ResourceGroupName,VmCreationResourceGroupName,IpConfig,BastionEnabled,SharedImageGalleryName,ShutDownTime,TimezoneId,LabRegion,LabOwners,LabUsers,
+CyberLab1,CyberLab1_rg,,Private,true,SharedImageGallery_DevTestLabs," 1900"," ""W. Europe Standard Time"""," westeurope"," ""phauge@microsoft.com"""," ""lucabol@microsoft.com","phauge@microsoft.com"""
+CyberLab2,CyberLab2_rg,,Public,false,SharedImageGallery_DevTestLabs," 1900"," ""W. Europe Standard Time"""," westeurope"," ""phauge@microsoft.com"""," ""lucabol@microsoft.com","phauge@microsoft.com"""
+CyberLab3,CyberLab3_rg,CyberLab3_rg,Shared,false,SharedImageGallery_DevTestLabs," 1900"," ""W. Europe Standard Time"""," westeurope"," ""phauge@microsoft.com"""," ""lucabol@microsoft.com","phauge@microsoft.com"""
+CyberLab4,CyberLab4_rg,CyberLab4_rg,Shared,false,SharedImageGallery_DevTestLabs," 1900"," ""W. Europe Standard Time"""," westeurope"," ""phauge@microsoft.com"""," ""lucabol@microsoft.com","phauge@microsoft.com"""
+CyberLab5,CyberLab5_rg,CyberLab5_rg,Private,false,SharedImageGallery_DevTestLabs," 1900"," ""W. Europe Standard Time"""," westeurope"," ""phauge@microsoft.com"""," ""lucabol@microsoft.com","phauge@microsoft.com"""
+CyberLab6,CyberLab6_rg,CyberLab6_rg,Shared,false,SharedImageGallery_DevTestLabs," 1900"," ""W. Europe Standard Time"""," westeurope"," ""phauge@microsoft.com"""," ""lucabol@microsoft.com","phauge@microsoft.com"""
