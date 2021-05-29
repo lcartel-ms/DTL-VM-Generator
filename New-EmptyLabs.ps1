@@ -5,7 +5,7 @@ param
     [string] $ConfigFile = "config.csv",
     
     [Parameter(Mandatory=$false, HelpMessage="How many seconds to wait before starting the next parallel lab creation")]
-    [int] $SecondsBetweenLoop =  60,
+    [int] $SecondsBetweenLoop =  15,
 
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false, HelpMessage="Custom Role to add users to")]
@@ -35,7 +35,7 @@ $config | ForEach-Object {
         $existingVmCreationRg = Get-AzResourceGroup -Name $_.VmCreationResourceGroupName -Location $_.LabRegion -ErrorAction SilentlyContinue
 
         if(-not $existingVmCreationRg) {
-          Write-Host "Creating Resource Group '$($_.VmCreationResourceGroupName)' for lab '$($_.DevTestLabName)' ..." -ForegroundColor Green
+          Write-Host "Creating VM Creation Resource Group '$($_.VmCreationResourceGroupName)' for lab '$($_.DevTestLabName)' ..." -ForegroundColor Green
           New-AzResourceGroup -Name $_.VmCreationResourceGroupName -Location $_.LabRegion | Out-Null
         }
     }
@@ -46,11 +46,16 @@ Write-Host "---------------------------------" -ForegroundColor Green
 Write-Host "Creating $configCount labs..." -ForegroundColor Green
 
 $LabCreateSB = {
-param($labConfig, $customRole)
+param($labConfig, $customRole, $utilities)
 
     # Make sure we stop for errors
     $ErrorActionPreference = "Stop"
-    
+
+    # Reimport the utilities
+    if (-not (Get-Command -Name "Set-LabAccessControl" -ErrorAction SilentlyContinue)) {
+        . $utilities    # Import all our utilities if needed
+    }
+  
     Write-Output "Creating Lab $($labConfig.DevTestLabName) in Resource group $($labConfig.ResourceGroupName)"
     $lab = $labConfig | New-AzDtlLab -VmCreationSubnetPrefix "10.0.0.0/21" -VmCreationResourceGroupName $labConfig.VmCreationResourceGroupName
 
@@ -75,7 +80,7 @@ param($labConfig, $customRole)
 
 $labCreateJobs = @()
 $config | ForEach-Object {
-    $labCreateJobs += Start-RSJob -Name "$($_.DevTestLabName)-JobId$(Get-Random)" -ScriptBlock $LabCreateSB -ArgumentList $_, $CustomRole -ModulesToImport $AzDtlModulePath -FunctionsToImport Set-LabAccessControl
+    $labCreateJobs += Start-RSJob -Name "$($_.DevTestLabName)-JobId$(Get-Random)" -ScriptBlock $LabCreateSB -ArgumentList $_, $CustomRole, ((Resolve-Path ".\Utils.ps1").Path) -ModulesToImport $AzDtlModulePath
     Start-Sleep -Seconds $SecondsBetweenLoop
 }
 

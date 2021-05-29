@@ -265,7 +265,7 @@ function DeployLab {
     if ($VmCreationResourceGroupName) {
 
       # Import again the module, only if it hasn't already been imported
-      if (-not (Get-Command -Name "Get-AzDtlLab")) {
+      if (-not (Get-Command -Name "Get-AzDtlLab" -ErrorAction SilentlyContinue)) {
         Import-Module "$workingDir\Az.DevTestLabs2.psm1"
       }
 
