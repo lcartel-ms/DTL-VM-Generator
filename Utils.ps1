@@ -108,7 +108,7 @@ function Set-LabAccessControl {
     # First see if the role assignment already exists, if so, just log it
     $ra = Get-AzRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
     if ($ra) {
-        Write-Host "Role assignment for owner $owneremail already exists in lab $DevTestLabName, skipping... "
+        Write-Output "   Role assignment for owner $owneremail already exists in lab $DevTestLabName, skipping... "
     }
     else {
         $ra = New-AzRoleAssignment -SignInName $owneremail -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
@@ -120,7 +120,7 @@ function Set-LabAccessControl {
             if ($user) {
                 $ra = Get-AzRoleAssignment -ObjectId $user.ObjectId -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
                 if ($ra) {
-                    Write-Host "Role assignment for owner $owneremail already exists in lab $DevTestLabName, skipping... "
+                    Write-Output "   Role assignment for owner $owneremail already exists in lab $DevTestLabName, skipping... "
                 }
                 else {
                     $ra = New-AzRoleAssignment -ObjectId $user.ObjectId -RoleDefinitionName 'Owner' -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
@@ -129,10 +129,10 @@ function Set-LabAccessControl {
         }
 
         if ($ra) {
-            Write-Host "$owneremail added as Owner in Lab '$DevTestLabName'"
+            Write-Output "   $owneremail added as Owner in Lab '$DevTestLabName'"
         }
         else {
-            Write-Host "Unable to add $owneremail as Owner in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
+            Write-Output "   Unable to add $owneremail as Owner in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
         }
     }
   }
@@ -142,7 +142,7 @@ function Set-LabAccessControl {
     $ra = Get-AzRoleAssignment -SignInName $useremail -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
 
     if ($ra) {
-        Write-Host "Role assignment for user $useremail already exists in lab $DevTestLabName, skipping... "
+        Write-Output "   Role assignment for user $useremail already exists in lab $DevTestLabName, skipping... "
     }
     else {
         $ra = New-AzRoleAssignment -SignInName $useremail -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
@@ -154,7 +154,7 @@ function Set-LabAccessControl {
             if ($user) {
                 $ra = Get-AzRoleAssignment -ObjectId $user.ObjectId -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
                 if ($ra) {
-                    Write-Host "Role assignment for user $useremail already exists in lab $DevTestLabName, skipping... "
+                    Write-Output "   Role assignment for user $useremail already exists in lab $DevTestLabName, skipping... "
                 }
                 else {
                     $ra = New-AzRoleAssignment -ObjectId $user.ObjectId -RoleDefinitionName $customRole -ResourceGroupName $ResourceGroupName -ResourceName $DevTestLabName -ResourceType 'Microsoft.DevTestLab/labs' -ErrorAction SilentlyContinue
@@ -163,10 +163,10 @@ function Set-LabAccessControl {
         }
 
         if ($ra) {
-            Write-Host "$useremail added as $customRole in Lab '$DevTestLabName'"
+            Write-Output "   $useremail added as $customRole in Lab '$DevTestLabName'"
         }
         else {
-            Write-Host "Unable to add $useremail as $customRole in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
+            Write-Output "   Unable to add $useremail as $customRole in Lab '$DevTestLabName', cannot find the user in AAD OR the Custom Role doesn't exist." -ForegroundColor Yellow
         }
     }
   }
@@ -318,7 +318,7 @@ function Get-VirtualNetworkUnallocatedSpace {
     # Ordered Array of unallocated ranges (CIDR notation) calculated as a complement to the above table
     $unallocatedSubnetRanges = [System.Collections.ArrayList]@()
 
-    $allocatedSubnetStarts = [array]$allocatedSubnetRanges.Keys
+    $allocatedSubnetStarts = [array]($allocatedSubnetRanges.Keys | Sort-Object)
     $allocatedSubnetStarts | ForEach-Object {
 
       $index = $allocatedSubnetStarts.IndexOf($_)
@@ -650,6 +650,11 @@ function Import-ConfigFile {
       $lab.BastionEnabled = [System.Convert]::ToBoolean($lab.BastionEnabled)
     } else {
       $lab.BastionEnabled = $false
+    }
+
+    # If Vm ResourceGroupName is set to 'default'
+    if ($lab.VmCreationResourceGroupName -ieq "default") {
+      $lab.VmCreationResourceGroupName = $null
     }
 
     # Also add "Name" since that's used by the DTL Library for DevTestLabName
