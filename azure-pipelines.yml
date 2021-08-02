@@ -9,17 +9,5 @@ trigger:
 pool: default
 
 steps:
-- script: echo Hello, world from Windows!
-  displayName: 'Run a one-line script'
-
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
-
-- script: |
-    cd C:\scripts\DTL-VM-Generator\DTL-VM-Generator-main
-  displayName: Set root directory to the scripts folders 
-
 - powershell: .\Create-Vms.ps1 -IfExist "Error"
   displayName: Create machines
