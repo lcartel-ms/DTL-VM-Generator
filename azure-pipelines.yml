@@ -9,5 +9,11 @@ trigger:
 pool: default
 
 steps:
-- powershell: .\Create-Vms.ps1 -IfExist "Error"
-  displayName: Create machines
+
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: 'SP - NTO'
+    scriptType: 'ps'
+    scriptLocation: 'scriptPath'
+    scriptPath: 'Create-Vms.ps1'
+    arguments: '-IfExist "Error"'
