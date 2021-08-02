@@ -43,16 +43,7 @@ steps:
     inputs:
       azureSubscription: 'SP - NTO'
       ScriptType: 'FilePath'
-      ScriptPath: 'Remove-Vms.ps1'
-      ScriptArguments: '-IfExist "Error"'
-      azurePowerShellVersion: 'LatestVersion'
-    displayName: 'Launching remove VM script'      
-
-  - task: AzurePowerShell@5
-    inputs:
-      azureSubscription: 'SP - NTO'
-      ScriptType: 'FilePath'
       ScriptPath: 'Create-Vms.ps1'
-      ScriptArguments: '-IfExist "Error"'
+      ScriptArguments: '-IfExist "Delete"'
       azurePowerShellVersion: 'LatestVersion'
     displayName: 'Launching create VM script'      
