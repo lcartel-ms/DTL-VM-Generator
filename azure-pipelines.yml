@@ -18,9 +18,8 @@ steps:
   displayName: 'Run a multi-line script'
 
 - script: |
-    cmd /k hostname
-  displayName: 'Check the name of the agent'
+    cd C:\scripts\DTL-VM-Generator\DTL-VM-Generator-main
+  displayName: Set root directory to the scripts folders 
 
-# for Windows PowerShell
-#steps:
-#- powershell: .\my-script.ps1
+- powershell: .\Create-Vms.ps1 -IfExist "Error"
+  displayName: Create machines
