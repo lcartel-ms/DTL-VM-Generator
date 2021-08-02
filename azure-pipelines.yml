@@ -30,6 +30,7 @@ steps:
         #Add your AzCopy path to the Windows environment PATH (C:\Users\AzureAdmin\AzCopy in this example), e.g., using PowerShell:
         $userenv = [System.Environment]::GetEnvironmentVariable("Path", "User")
         [System.Environment]::SetEnvironmentVariable("PATH", $userenv + ";C:\Users\AzureAdmin\AzCopy", "User")
+      azurePowerShellVersion: 'LatestVersion'
 
   #Download the config.csv file on the agent
   - task: AzurePowerShell@5
