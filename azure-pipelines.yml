@@ -41,7 +41,7 @@ steps:
         $OutputFilePath = '.' # Path to download the file to
         $StorageAccountName = 'configsavm'
         $ContainerName = 'mycontainer'
-        $StorageContext = New-AzStorageContext -StorageAccountName 
+        $StorageContext = New-AzStorageContext -StorageAccountName $StorageAccountName
         
         Get-AzStorageBlobContent -Blob $BlobFilePath -Container $ContainerName -Destination $OutputFilePath -Context $StorageContext
       azurePowerShellVersion: 'LatestVersion'
