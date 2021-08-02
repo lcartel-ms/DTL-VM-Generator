@@ -10,7 +10,8 @@ pool: default
 
 jobs:
   - job: MainJob
-    timeoutInMinutes: 0 "Set to 0 for Maxium Time"
+    #Timeout set to 0 = Unlimited time on self hosted agent
+    timeoutInMinutes: 0 
     steps:
       #Download the config.csv file on the agent
       - task: AzurePowerShell@5
