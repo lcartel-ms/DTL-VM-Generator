@@ -21,7 +21,7 @@ steps:
         $ContainerName = 'mycontainer'
 
         # Prompt for Azure Account creds, if working from VM with managed identity could add also switch -Identity to use that identity directly
-        $StorageContext = New-AzStorageContext -StorageAccountName $StorageAccountName
+        $StorageContext = New-AzStorageContext -StorageAccountName $StorageAccountName -SasToken sp=r&st=2021-08-02T13:21:01Z&se=2021-08-02T21:21:01Z&spr=https&sv=2020-08-04&sr=c&sig=Njt5vGLQSmpkUZ8uMJeo3GsZqGXBtjq5dowFlv9eE%2Fo%3D
 
         Get-AzStorageBlobContent -Blob $BlobFilePath -Container $ContainerName -Destination $OutputFilePath -Context $StorageContext
       azurePowerShellVersion: 'LatestVersion'
