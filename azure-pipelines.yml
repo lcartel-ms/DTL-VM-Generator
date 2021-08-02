@@ -44,6 +44,7 @@ steps:
         $StorageContext = New-AzStorageContext -StorageAccountName 
         
         Get-AzStorageBlobContent -Blob $BlobFilePath -Container $ContainerName -Destination $OutputFilePath -Context $StorageContext
+      azurePowerShellVersion: 'LatestVersion'
 
   #Install the different files from the Az Copy folder
   - task: PowerShell@2
