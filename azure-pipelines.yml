@@ -9,11 +9,10 @@ trigger:
 pool: default
 
 steps:
-
-- task: AzureCLI@2
-  inputs:
-    azureSubscription: 'SP - NTO'
-    scriptType: 'ps'
-    scriptLocation: 'scriptPath'
-    scriptPath: 'Create-Vms.ps1'
-    arguments: '-IfExist "Error"'
+  - task: AzurePowerShell@5
+    inputs:
+      azureSubscription: 'SP - NTO'
+      ScriptType: 'FilePath'
+      ScriptPath: 'Create-Vms.ps1'
+      ScriptArguments: '-IfExist "Error"'
+      azurePowerShellVersion: 'LatestVersion'
