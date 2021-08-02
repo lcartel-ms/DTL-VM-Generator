@@ -21,7 +21,6 @@ steps:
         $ContainerName = 'mycontainer'
 
         # Prompt for Azure Account creds, if working from VM with managed identity could add also switch -Identity to use that identity directly
-        Connect-AzAccount 
         $StorageContext = New-AzStorageContext -StorageAccountName $StorageAccountName
 
         Get-AzStorageBlobContent -Blob $BlobFilePath -Container $ContainerName -Destination $OutputFilePath -Context $StorageContext
