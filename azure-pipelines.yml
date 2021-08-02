@@ -9,7 +9,43 @@ trigger:
 pool: default
 
 steps:
+  # #Install AZ Copy on the agent
+  # - task: AzurePowerShell@5
+  #   inputs:
+  #     azureSubscription: 'SP - NTO'
+  #     ScriptType: 'InlineScript'
+  #     Inline: |
+  #       #Download AzCopy
+  #       Invoke-WebRequest -Uri "https://aka.ms/downloadazcopy-v10-windows" -OutFile AzCopy.zip -UseBasicParsing
+         
+  #       #Curl.exe option
+  #       curl.exe -L -o AzCopy.zip https://aka.ms/downloadazcopy
+         
+  #       #Expand Archive
+  #       Expand-Archive ./AzCopy.zip ./AzCopy -Force
+         
+  #       #Move AzCopy to the destination you want to store it
+  #       Get-ChildItem ./AzCopy/*/azcopy.exe | Move-Item -Destination "C:\Users\thmaure\AzCopy\AzCopy.exe"
+         
+  #       #Add your AzCopy path to the Windows environment PATH (C:\Users\AzureAdmin\AzCopy in this example), e.g., using PowerShell:
+  #       $userenv = [System.Environment]::GetEnvironmentVariable("Path", "User")
+  #       [System.Environment]::SetEnvironmentVariable("PATH", $userenv + ";C:\Users\AzureAdmin\AzCopy", "User")
 
+  #Download the config.csv file on the agent
+  - task: AzurePowerShell@5
+    inputs:
+      azureSubscription: 'SP - NTO'
+      ScriptType: 'InlineScript'
+      Inline: |
+        $BlobFilePath = 'config.csv' # Relative path in blob starting from container
+        $OutputFilePath = '.' # Path to download the file to
+        $StorageAccountName = 'configsavm'
+        $ContainerName = 'mycontainer'
+        $StorageContext = New-AzStorageContext -StorageAccountName 
+        
+        Get-AzStorageBlobContent -Blob $BlobFilePath -Container $ContainerName -Destination $OutputFilePath -Context $StorageContext
+
+  #Install the different files from the Az Copy folder
   - task: PowerShell@2
     inputs:
       targetType: 'inline'
@@ -19,6 +55,9 @@ steps:
         Install-Module -Name Az -AllowClobber -Scope CurrentUser -Force
         Install-Module Az.Accounts -Scope CurrentUser -Force
         Install-Module AzureAD
+
+
+  #Copy the CSV configurations files from the storage account
 
   - task: AzurePowerShell@5
     inputs:
