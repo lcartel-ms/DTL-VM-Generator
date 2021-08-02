@@ -8,42 +8,45 @@ trigger:
 
 pool: default
 
-steps:
-  #Download the config.csv file on the agent
-  - task: AzurePowerShell@5
-    inputs:
-      azureSubscription: 'SP - NTO'
-      ScriptType: 'InlineScript'
-      Inline: |
-        $BlobFilePath = 'config.csv' # Relative path in blob starting from container
-        $OutputFilePath = '.' # Path to download the file to
-        $StorageAccountName = 'configsavm'
-        $ContainerName = 'mycontainer'
-        $SaSToken = 'sp=r&st=2021-08-02T13:21:01Z&se=2021-08-02T21:21:01Z&spr=https&sv=2020-08-04&sr=c&sig=Njt5vGLQSmpkUZ8uMJeo3GsZqGXBtjq5dowFlv9eE%2Fo%3D'
-        # Prompt for Azure Account creds, if working from VM with managed identity could add also switch -Identity to use that identity directly
-        $StorageContext = New-AzStorageContext -StorageAccountName $StorageAccountName -SasToken $SaSToken 
+jobs:
+  - job: MainJob
+    timeoutInMinutes: 0 "Set to 0 for Maxium Time"
+    steps:
+      #Download the config.csv file on the agent
+      - task: AzurePowerShell@5
+        inputs:
+          azureSubscription: 'SP - NTO'
+          ScriptType: 'InlineScript'
+          Inline: |
+            $BlobFilePath = 'config.csv' # Relative path in blob starting from container
+            $OutputFilePath = '.' # Path to download the file to
+            $StorageAccountName = 'configsavm'
+            $ContainerName = 'mycontainer'
+            $SaSToken = 'sp=r&st=2021-08-02T13:21:01Z&se=2021-08-02T21:21:01Z&spr=https&sv=2020-08-04&sr=c&sig=Njt5vGLQSmpkUZ8uMJeo3GsZqGXBtjq5dowFlv9eE%2Fo%3D'
+            # Prompt for Azure Account creds, if working from VM with managed identity could add also switch -Identity to use that identity directly
+            $StorageContext = New-AzStorageContext -StorageAccountName $StorageAccountName -SasToken $SaSToken 
 
-        Get-AzStorageBlobContent -Blob $BlobFilePath -Container $ContainerName -Destination $OutputFilePath -Context $StorageContext
-      azurePowerShellVersion: 'LatestVersion'
-    displayName: 'Copy config.csv file'
+            Get-AzStorageBlobContent -Blob $BlobFilePath -Container $ContainerName -Destination $OutputFilePath -Context $StorageContext
+          azurePowerShellVersion: 'LatestVersion'
+        displayName: 'Copy config.csv file'
 
-  #Install the different files from the Az Copy folder
-  - task: PowerShell@2
-    inputs:
-      targetType: 'inline'
-      script: |
-        # Write your PowerShell commands here.
-        
-        Install-Module -Name Az -AllowClobber -Scope CurrentUser -Force
-        Install-Module Az.Accounts -Scope CurrentUser -Force
-        Install-Module AzureAD
-    displayName: 'Installing Powershell Modules'
+      #Install the different files from the Az Copy folder
+      - task: PowerShell@2
+        inputs:
+          targetType: 'inline'
+          script: |
+            # Write your PowerShell commands here.
+            
+            Install-Module -Name Az -AllowClobber -Scope CurrentUser -Force
+            Install-Module Az.Accounts -Scope CurrentUser -Force
+            Install-Module AzureAD
+        displayName: 'Installing Powershell Modules'
 
-  - task: AzurePowerShell@5
-    inputs:
-      azureSubscription: 'SP - NTO'
-      ScriptType: 'FilePath'
-      ScriptPath: 'Create-Vms.ps1'
-      ScriptArguments: '-IfExist "Delete"'
-      azurePowerShellVersion: 'LatestVersion'
-    displayName: 'Launching create VM script'      
+      - task: AzurePowerShell@5
+        inputs:
+          azureSubscription: 'SP - NTO'
+          ScriptType: 'FilePath'
+          ScriptPath: 'Create-Vms.ps1'
+          ScriptArguments: '-IfExist "Delete"'
+          azurePowerShellVersion: 'LatestVersion'
+        displayName: 'Launching create VM script'      
